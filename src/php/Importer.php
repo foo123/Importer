@@ -166,12 +166,12 @@ class Importer
                 foreach ($defs as $def)
                 {
                     /* 0:class, 1:id, 2:path, 3:deps */
-                    $class = $def[0]; $id = $def[1]; $path = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
+                    $classname = $def[0]; $id = $def[1]; $path = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     if ( !empty( $class ) && !empty( $id ) && !empty( $path ) ) 
                     {
                         $this->classes[ $id ] = array(
                             /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
-                            $class, 
+                            $classname, 
                             $id, 
                             $this->path( $path ), 
                             (array)$deps, 
@@ -308,14 +308,14 @@ class Importer
                 if ( $isStyle )
                 {
                     $out[] = $isLiteral 
-                            ? ("<style id=\"$id\" type=\"text/css\" media=\"all\">{$asset[0]}</style>")
-                            : ("<link id=\"$id\" type=\"text/css\" rel=\"stylesheet\" href=\"$asset\" media=\"all\" />");
+                            ? ("<style id=\"importer-inline-style-{$id}\" type=\"text/css\" media=\"all\">{$asset[0]}</style>")
+                            : ("<link id=\"importer-style-{$id}\" type=\"text/css\" rel=\"stylesheet\" href=\"$asset\" media=\"all\" />");
                 }
                 elseif ( $isScript )
                 {
                     $out[] = $isLiteral 
-                            ? ("<script id=\"$id\" type=\"text/javascript\">/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>")
-                            : ("<script id=\"$id\" type=\"text/javascript\" src=\"$asset\"></script>");
+                            ? ("<script id=\"importer-inline-script-{$id}\" type=\"text/javascript\">/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>")
+                            : ("<script id=\"importer-script-{$id}\" type=\"text/javascript\" src=\"$asset\"></script>");
                 }
                 else
                 {
@@ -374,12 +374,19 @@ class Importer
         return null;
     }
     
-    public function import( $class, $path=null, $deps=array() )
+    public function import( $classname, $path=null, $deps=array() )
     {
-        if ( !isset( $this->classes[$class] ) && !empty($path) )
-            $this->register("classes", array($class, $class, $this->path("$path.php"), $deps));
-        if ( isset( $this->classes[$class] ) && !$this->classes[$class][4] && file_exists( $this->classes[$class][2] ) )
-            $this->import_class($class);
+        if ( !isset( $this->classes[$classname] ) && !empty($path) )
+            $this->register("classes", array($classname, $classname, $this->path("$path.php"), $deps));
+        if ( isset( $this->classes[$classname] ) && !$this->classes[$classname][4] && file_exists( $this->classes[$classname][2] ) )
+            $this->import_class($classname);
+        return $this;
+    }
+    
+    public function importAll( $classnames )
+    {
+        if ( empty($classnames) ) return $this;
+        foreach((array)$classnames as $classname) $this->import( $classname );
         return $this;
     }
 }
