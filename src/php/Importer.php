@@ -155,7 +155,7 @@ class Importer
         return $this->get_path( $asset, $this->base_url );
     }
     
-    public function register( $what, $defs )
+    public function register( $what, $defs, $ctx=null )
     {
         if ( is_array( $defs ) && !empty( $defs ) )
         {
@@ -220,8 +220,24 @@ class Importer
                                         Contemplate::add($dep, $this->path("$dep.tpl.html"));
                                 }
                             }*/
-                            if ( !Contemplate::hasTpl( $id ) ) 
-                                Contemplate::add( $id, $this->path( $path ) );
+                            if ( null !== $ctx )
+                            {
+                                if ( !Contemplate::hasTpl( $id, $ctx ) )
+                                {
+                                    $args = array();
+                                    $args[$id] = $this->path( $path );
+                                    Contemplate::add( $args, $ctx );
+                                }
+                            }
+                            else
+                            {
+                                if ( !Contemplate::hasTpl( $id ) )
+                                {
+                                    $args = array();
+                                    $args[$id] = $this->path( $path );
+                                    Contemplate::add( $args );
+                                }
+                            }
                         }
                     }
                 }
@@ -363,14 +379,13 @@ class Importer
         return implode("\n", $out);
     }
     
-    public function tpl( $tpl, $path=null, $deps=array() )
+    public function tpl( $tpl, $path=null, $deps=array(), $ctx=null )
     {
         // support Contemplate templates functionality
         if ( class_exists('Contemplate') )
         {
-            if ( !empty( $path ) ) 
-                $this->register( "templates", array($tpl, $path, $deps) );
-            return Contemplate::tpl( $tpl );
+            if ( !empty( $path ) ) $this->register( "templates", array($tpl, $path, $deps), $ctx );
+            return null !== $ctx ? Contemplate::tpl( $tpl, null, $ctx ) : Contemplate::tpl( $tpl );
         }
         return null;
     }
