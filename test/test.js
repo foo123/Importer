@@ -1,6 +1,8 @@
 var Importer = require( "../src/js/Importer.js" ), echo = console.log;
 
-var importer = new Importer( __dirname, './' );
+echo(Importer.BASE);
+
+var importer = new Importer( __dirname, 'http://_mygit/Importer/test/' );
 importer.register("classes", [
 
  ['Test1',             'Test1',             './classes/Test1.js']

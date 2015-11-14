@@ -9,6 +9,9 @@
     <script type="text/javascript">
     var base = location.href.split('/').slice(0,-1).join('/'), echo = console.log;
     var importer = new Importer( './', base );
+    
+    echo(Importer.BASE);
+    
     importer.register("classes", [
 
      ['Test1',             'Test1',             './classes/Test1.js']

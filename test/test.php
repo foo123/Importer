@@ -1,7 +1,9 @@
 <?php
 require( "../src/php/Importer.php" );
 
-$importer = new Importer( dirname(__FILE__), './' );
+echo(Importer::$BASE . PHP_EOL);
+
+$importer = new Importer( dirname(__FILE__), 'http://_mygit/Importer/test/' );
 $importer->register("classes", array(
 
  array('Test1',             'Test1',             './classes/Test1.php')

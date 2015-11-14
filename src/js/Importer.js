@@ -29,29 +29,20 @@ else if ( !(name in root) )
     /* module factory */        function( exports, undef ) {
 "use strict";
 
-var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute',
+var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 'toLowerCase',
     toString = Object[PROTO].toString, map = Array[PROTO].map,
-    
-    is_callable = function( o ){ return "function" === typeof o; },
-    is_string = function( o ){ return o instanceof String || '[object String]' === toString.call(o); },
-    is_array = function( o ){ return o instanceof Array || '[object Array]' === toString.call(o); },
-    is_obj = function( o ){ return o instanceof Object || '[object Object]' === toString.call(o); },
-    empty = function( o ){ 
-        if ( !o ) return true;
-        var to_string = toString.call(o);
-        return (o instanceof Array || o instanceof String || '[object Array]' === to_string || '[object String]' === to_string) && !o.length;
-    },
-    array = function( o ){ return is_array( o ) ? o : [o]; },
-    startsWith = String[PROTO].startsWith 
-            ? function( s, pre, pos ){return s.startsWith(pre, pos||0);} 
-            : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
-    DS = '/', DS_RE = /\/|\\/g, PROTOCOL = '://', PROTOCOL_RE = '#PROTOCOL#',
     
     isNode = ("undefined" !== typeof global) && ("[object global]" === toString.call(global)),
     isWebWorker = !isNode && ('undefined' !== typeof WorkerGlobalScope) && ("function" === typeof importScripts) && (navigator instanceof WorkerNavigator),
     isBrowser = !isNode && !isWebWorker && ("undefined" !== typeof navigator), 
     
-    Scope = isNode ? global : this,
+    Scope = isNode ? global : (isWebWorker ? this : window),
+    
+    DS = '/', DS_RE = /\/|\\/g, PROTOCOL = '://', PROTOCOL_RE = '#PROTOCOL#',
+    startsWith = String[PROTO].startsWith 
+            ? function( s, pre, pos ){return s.startsWith(pre, pos||0);} 
+            : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
+    
     
     read_file = isNode
     ? function( path, enc ) {
@@ -105,8 +96,48 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute',
     Importer
 ;
 
+function is_callable( o )
+{
+    return "function" === typeof o;
+}
+function is_string( o )
+{
+    return o instanceof String || '[object String]' === toString.call(o);
+}
+function is_array( o )
+{
+    return o instanceof Array || '[object Array]' === toString.call(o);
+}
+function is_obj( o )
+{
+    return o instanceof Object || '[object Object]' === toString.call(o);
+}
+function empty( o )
+{ 
+    if ( !o ) return true;
+    var to_string = toString.call(o);
+    return (o instanceof Array || o instanceof String || '[object Array]' === to_string || '[object String]' === to_string) && !o.length;
+}
+function array( o )
+{
+    return is_array( o ) ? o : [o];
+}
+function $$( id )
+{
+    return document.getElementById( id );
+}
+function $$el( element )
+{
+    return document.createElement( element );
+}
+function $$tag( tag, index )
+{
+    var els = document.getElementsByTagName( tag );
+    return arguments.length > 1 ? (index < 0 ? els[els.length+index] : els[index]) : els;
+}
+
 // http://davidwalsh.name/add-rules-stylesheets
-function add_css( style, css ) 
+function $$css( style, css ) 
 {
     var css_type = typeof css, n, index, declaration, selector, rules;
     
@@ -142,7 +173,7 @@ function add_css( style, css )
     return css;
 }
 
-function create_asset( type, src, unique )
+function $$asset( type, src, unique )
 {
     var asset = null, link = null, i, links;
     switch( type )
@@ -152,7 +183,7 @@ function create_asset( type, src, unique )
         // literal tpl
         case "tpl":
             // Create the <script> tag
-            asset = document.createElement("script");
+            asset = $$el("script");
             asset[ATTR]("type", "text/x-tpl");
             // WebKit hack :(
             asset.appendChild( document.createTextNode(src) );
@@ -165,7 +196,7 @@ function create_asset( type, src, unique )
             if ( unique )
             {
                 // external script, only if not exists
-                links = document.head.getElementsByTagName("script");
+                links = $$tag("script");
                 for (i=links.length-1; i>=0; i--) 
                 {
                     if ( links[i].src && src === links[i].src ) 
@@ -184,7 +215,7 @@ function create_asset( type, src, unique )
             else
             {
                 // Create the <script> tag
-                asset = document.createElement('script');
+                asset = $$el('script');
                 asset[ATTR]("type", "text/javascript");
                 asset[ATTR]("language", "javascript");
                 asset[ATTR]("src", src);
@@ -196,7 +227,7 @@ function create_asset( type, src, unique )
         // literal script
         case "script":
             // Create the <script> tag
-            asset = document.createElement("script");
+            asset = $$el("script");
             asset[ATTR]("type", "text/javascript");
             asset[ATTR]("language", "javascript");
             // WebKit hack :(
@@ -210,7 +241,7 @@ function create_asset( type, src, unique )
             if ( unique )
             {
                 // external stylesheet, only if not exists
-                links = document.head.getElementsByTagName("link");
+                links = $$tag("link");
                 for (i=links.length-1; i>=0; i--) 
                 {
                     if ( src === links[i].href ) 
@@ -229,7 +260,7 @@ function create_asset( type, src, unique )
             else
             {
                 // Create the <link> tag
-                asset = document.createElement('link');
+                asset = $$el('link');
                 // Add a media (and/or media query) here if you'd like!
                 asset[ATTR]("type", "text/css");
                 asset[ATTR]("rel", "stylesheet");
@@ -244,7 +275,7 @@ function create_asset( type, src, unique )
         case "style":
         default:
             // Create the <style> tag
-            asset = document.createElement("style");
+            asset = $$el("style");
             // Add a media (and/or media query) here if you'd like!
             asset[ATTR]("type", "text/css");
             asset[ATTR]("media", "all");
@@ -252,7 +283,7 @@ function create_asset( type, src, unique )
             asset.appendChild( document.createTextNode("") );
             // Add the <style> element to the page
             document.head.appendChild( asset );
-            if ( src ) add_css( asset, src );
+            if ( src ) $$css( asset, src );
             break;
     }
     return asset;
@@ -275,6 +306,7 @@ function load_deps( scope, cache, ref, complete )
         for (i=0; i<dl; i++) 
         {
             if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
+            else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[ i ].cache_id ] = read_file( ref[ i ].path, 'utf8' );
             else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
             else loaded[ i ] = require( ref[ i ].path ) || null;
         }
@@ -286,6 +318,7 @@ function load_deps( scope, cache, ref, complete )
         for (i=0; i<dl; i++) 
         {
             if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
+            else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[ i ].cache_id ] = read_file( ref[ i ].path, 'utf8' );
             else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
             else { importScripts( ref[ i ].path ); loaded[ i ] = scope[ ref[ i ].name ] || null; }
         }
@@ -294,33 +327,67 @@ function load_deps( scope, cache, ref, complete )
     // browser, <script> tags
     else
     {
-        head = document.getElementsByTagName("head")[ 0 ]; 
+        head = $$tag("head", 0); 
         t = 0; i = 0;
-        load = function load( id, path, next ) {
+        load = function load( id, type, path, next ) {
             var done, script;
-            if ( (script = document.getElementById(id)) && 'script' === script.tagName.toLowerCase( ) ) 
+            if ( 'style' === type || 'script' === type )
             {
-                next( );
+                if ( (script = $$(id)) && type === script.tagName[LOWER]( ) ) 
+                {
+                    next( );
+                }
+                else
+                {
+                    read_file_async( path, 'utf8', function(data){
+                        cache[ id ]  = data;
+                        $$asset(type, data)[ATTR]("id", id);
+                        next( );
+                    });
+                }
+            }
+            else if ( 'class' !== type )
+            {
+                if ( 'template' === type && (script = $$(id)) && 'script' === script.tagName[LOWER]( ) ) 
+                {
+                    next( );
+                }
+                else
+                {
+                    read_file_async( path, 'utf8', function(data){
+                        cache[ id ]  = data;
+                        if ( 'template' === type && !$$(id) )
+                            $$asset('tpl', data)[ATTR]("id", id);
+                        next( );
+                    });
+                }
             }
             else
             {
-                done = 0;
-                script = document.createElement('script');
-                script[ATTR]('id', id); 
-                script[ATTR]('type', 'text/javascript'); 
-                script[ATTR]('language', 'javascript');
-                script.onload = script.onreadystatechange = function( ) {
-                    if (!done && (!script.readyState || script.readyState == 'loaded' || script.readyState == 'complete'))
-                    {
-                        done = 1; 
-                        script.onload = script.onreadystatechange = null;
-                    }
+                if ( (script = $$(id)) && 'script' === script.tagName[LOWER]( ) ) 
+                {
                     next( );
                 }
-                // load it
-                //script.src = path;
-                script[ATTR]('src', path);
-                head.appendChild( script ); 
+                else
+                {
+                    done = 0;
+                    script = $$el('script');
+                    script[ATTR]('id', id); 
+                    script[ATTR]('type', 'text/javascript'); 
+                    script[ATTR]('language', 'javascript');
+                    script.onload = script.onreadystatechange = function( ) {
+                        if (!done && (!script.readyState || script.readyState == 'loaded' || script.readyState == 'complete'))
+                        {
+                            done = 1; 
+                            script.onload = script.onreadystatechange = null;
+                        }
+                        next( );
+                    }
+                    // load it
+                    //script.src = path;
+                    script[ATTR]('src', path);
+                    head.appendChild( script ); 
+                }
             }
         };
         next = function next( ) {
@@ -340,7 +407,7 @@ function load_deps( scope, cache, ref, complete )
                 else
                 {                    
                     scope[ ref[ i ].name ] = null;
-                    load( ref[ i ].cache_id, ref[ i ].path, next );
+                    load( ref[ i ].cache_id, ref[ i ].type, ref[ i ].path, next );
                 }
             }
             else if ( ++t < 4 ) 
@@ -359,7 +426,7 @@ function load_deps( scope, cache, ref, complete )
             loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
             i++;
         }
-        if ( i < dl ) load( ref[ i ].cache_id, ref[ i ].path, next );
+        if ( i < dl ) load( ref[ i ].cache_id, ref[ i ].type, ref[ i ].path, next );
         else complete.apply( scope, loaded );
     }
 }
@@ -536,7 +603,7 @@ Importer[PROTO] = {
                     {
                         assets[ id ] = [
                             /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded */
-                            type.toLowerCase( ), 
+                            type[LOWER]( ), 
                             id, 
                             is_string( asset ) ? self.path_url( asset ) : asset, 
                             array(deps), 
@@ -594,6 +661,7 @@ Importer[PROTO] = {
                         classes[id][4] = true;
                         to_load.push({
                             id: id,
+                            type: 'class',
                             cache_id: 'class-' + id,
                             name: classes[id][0],
                             path: classes[id][2]
@@ -670,15 +738,15 @@ Importer[PROTO] = {
                     if ( isBrowser )
                     {
                         out.push( document_asset = is_inlined
-                            ? document.getElementById("importer-inline-style-"+id) || create_asset( 'style', asset[0] )
-                            : document.getElementById("importer-style-"+id) || create_asset( 'style-link', asset, true ) );
+                            ? $$("importer-inline-style-"+id) || $$asset( 'style', asset[0] )
+                            : $$("importer-style-"+id) || $$asset( 'style-link', self.path_url(asset), true ) );
                         document_asset[ATTR]('id', is_inlined ? "importer-inline-style-"+id : "importer-style-"+id);
                     }
                     else
                     {
                         out.push( is_inlined
                                 ? ("<style id=\"importer-inline-style-"+id+"\" type=\"text/css\" media=\"all\">"+asset[0]+"</style>")
-                                : ("<link id=\"importer-style-"+id+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+asset+"\" media=\"all\" />")
+                                : ("<link id=\"importer-style-"+id+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+self.path_url(asset)+"\" media=\"all\" />")
                         );
                     }
                 }
@@ -687,15 +755,15 @@ Importer[PROTO] = {
                     if ( isBrowser )
                     {
                         out.push( document_asset = is_inlined
-                            ? document.getElementById("importer-inline-script-"+id) || create_asset( 'script', "/*<![CDATA[*/ "+asset[0]+" /*]]>*/" )
-                            : document.getElementById("importer-script-"+id) || create_asset( 'script-link', asset, true ) );
+                            ? $$("importer-inline-script-"+id) || $$asset( 'script', "/*<![CDATA[*/ "+asset[0]+" /*]]>*/" )
+                            : $$("importer-script-"+id) || $$asset( 'script-link', self.path_url(asset), true ) );
                         document_asset[ATTR]('id', is_inlined ? "importer-inline-script-"+id : "importer-script-"+id);
                     }
                     else
                     {
                         out.push( is_inlined
                                 ? ("<script id=\"importer-inline-script-"+id+"\" type=\"text/javascript\">/*<![CDATA[*/ "+asset[0]+" /*]]>*/</script>")
-                                : ("<script id=\"importer-script-"+id+"\" type=\"text/javascript\" src=\""+asset+"\"></script>")
+                                : ("<script id=\"importer-script-"+id+"\" type=\"text/javascript\" src=\""+self.path_url(asset)+"\"></script>")
                         );
                     }
                 }
@@ -704,21 +772,21 @@ Importer[PROTO] = {
                     if ( isBrowser )
                     {
                         out.push( document_asset = is_inlined
-                            ? document.getElementById("importer-inline-tpl-"+id) || create_asset( 'tpl', asset[0] )
-                            : document.getElementById("importer-tpl-"+id) || create_asset( 'tpl-link', asset, true ) );
-                        document_asset[ATTR]('id', is_inlined ? "importer-inline-tpl-"+id : "importer-tpl-"+id);
+                            ? $$("importer-inline-tpl-"+id) || $$asset( 'tpl', asset[0] )
+                            : $$("importer-inline-tpl-"+id) || $$asset( 'tpl', self.getFile(asset) ) );
+                        document_asset[ATTR]('id', is_inlined ? "importer-inline-tpl-"+id : "importer-inline-tpl-"+id);
                     }
                     else
                     {
                         out.push( is_inlined
                                 ? ("<script id=\"importer-inline-tpl-"+id+"\" type=\"text/x-tpl\">"+asset[0]+"</script>")
-                                : ("<script id=\"importer-tpl-"+id+"\" type=\"text/x-tpl\">"+asset+"</script>")
+                                : ("<script id=\"importer-inline-tpl-"+id+"\" type=\"text/x-tpl\">"+self.getFile(asset)+"</script>")
                         );
                     }
                 }
                 else
                 {
-                    out.push( is_inlined ? asset[0] : asset );
+                    out.push( is_inlined ? asset[0] : self.getFile(asset) );
                 }
                 asset_def[5] = true; // loaded
             }
@@ -751,7 +819,7 @@ Importer[PROTO] = {
         var self = this, out, assets = self._assets, next,
             id, asset_def, i, l, to_load = [ ];
         if ( !arguments.length ) type = "scripts";
-        type = type.toLowerCase( );
+        type = type[LOWER]( );
         for (id in assets)
         {
             if ( !assets[HAS](id) ) continue;
@@ -842,20 +910,12 @@ Importer[PROTO] = {
     }
 }
 
-if ( isNode )
-{
-    Importer.BASE = __dirname;
-}
-else if ( isWebWorker )
-{
-    Importer.BASE = this.location.href.split('/').slice(0,-1).join('/');
-}
-else
-{
-    var this_script = document.getElementsByTagName('script'), link = document.createElement('a');
-    link.href = this_script[this_script.length-1].src||'./'; // absolute uri
-    Importer.BASE = link.href.split('/').slice(0,-1).join('/');
-}
+Importer.BASE = isNode
+    ? __dirname
+    : (isWebWorker
+    ? this.location.href.split('/').slice(0,-1).join('/')
+    : ($$tag('script', -1).src||'./').split('/').slice(0,-1).join('/') // absolute uri
+);
 
 // export it
 return Importer;

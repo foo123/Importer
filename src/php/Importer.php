@@ -329,23 +329,23 @@ class Importer
                 {
                     $out[] = $is_inlined
                             ? ("<style id=\"importer-inline-style-{$asset_id}\" type=\"text/css\" media=\"all\">{$asset[0]}</style>")
-                            : ("<link id=\"importer-style-{$asset_id}\" type=\"text/css\" rel=\"stylesheet\" href=\"$asset\" media=\"all\" />");
+                            : ("<link id=\"importer-style-{$asset_id}\" type=\"text/css\" rel=\"stylesheet\" href=\"".$this->path_url($asset)."\" media=\"all\" />");
                 }
                 elseif ( $is_script )
                 {
                     $out[] = $is_inlined
                             ? ("<script id=\"importer-inline-script-{$asset_id}\" type=\"text/javascript\">/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>")
-                            : ("<script id=\"importer-script-{$asset_id}\" type=\"text/javascript\" src=\"$asset\"></script>");
+                            : ("<script id=\"importer-script-{$asset_id}\" type=\"text/javascript\" src=\"".$this->path_url($asset)."\"></script>");
                 }
                 elseif ( $is_tpl )
                 {
                     $out[] = $is_inlined
                             ? ("<script id=\"importer-inline-tpl-{$asset_id}\" type=\"text/x-tpl\">{$asset[0]}</script>")
-                            : ("<script id=\"importer-tpl-{$asset_id}\" type=\"text/x-tpl\">".file_get_contents($asset)."</script>");
+                            : ("<script id=\"importer-inline-tpl-{$asset_id}\" type=\"text/x-tpl\">".$this->getFile($asset)."</script>");
                 }
                 else
                 {
-                    $out[] = $is_inlined ? $asset[0] : $asset;
+                    $out[] = $is_inlined ? $asset[0] : $this->getFile($asset);
                 }
                 $asset_def[5] = true; // loaded
             }
