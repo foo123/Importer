@@ -7,10 +7,16 @@ $importer = new Importer( dirname(__FILE__), 'http://_mygit/Importer/test/' );
 $importer->register("classes", array(
 
  array('Test1',             'Test1',             './classes/Test1.php')
-,array('Test2',             'Test2',             './classes/Test2.php', array('Test1'))
+,array('Test2',             'Test2',             './classes/Test2.php', array('Test1'), 'console_log')
 
 ));
 
+function console_log()
+{
+    $args = func_get_args();
+    echo ('Callback'.PHP_EOL);
+    print_r($args);
+}
 
 $importer->importClass('Test2');
 

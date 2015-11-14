@@ -15,7 +15,7 @@
     importer.register("classes", [
 
      ['Test1',             'Test1',             './classes/Test1.js']
-    ,['Test2',             'Test2',             './classes/Test2.js', ['Test1']]
+    ,['Test2',             'Test2',             './classes/Test2.js', ['Test1'], function(){echo('Callback');echo(arguments);}]
 
     ]);
 

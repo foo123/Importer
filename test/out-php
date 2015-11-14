@@ -1,6 +1,54 @@
 C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
 Test1.php
 Test2.php
+Callback
+Array
+(
+    [0] => Importer Object
+        (
+            [base:Importer:private] => C:\nikos\work\_nikos\open_source\git\nikos\Importer\test
+            [base_url:Importer:private] => http://_mygit/Importer/test/
+            [_classes:Importer:private] => Array
+                (
+                    [Test1] => Array
+                        (
+                            [0] => Test1
+                            [1] => Test1
+                            [2] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test1.php
+                            [3] => Array
+                                (
+                                )
+
+                            [4] => 1
+                            [5] => 
+                        )
+
+                    [Test2] => Array
+                        (
+                            [0] => Test2
+                            [1] => Test2
+                            [2] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test2.php
+                            [3] => Array
+                                (
+                                    [0] => Test1
+                                )
+
+                            [4] => 1
+                            [5] => console_log
+                        )
+
+                )
+
+            [_assets:Importer:private] => Array
+                (
+                )
+
+        )
+
+    [1] => Test2
+    [2] => Test2
+    [3] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test2.php
+)
 <?php
 
 class Test1

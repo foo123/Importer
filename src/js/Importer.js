@@ -39,6 +39,7 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     Scope = isNode ? global : (isWebWorker ? this : window),
     
     DS = '/', DS_RE = /\/|\\/g, PROTOCOL = '://', PROTOCOL_RE = '#PROTOCOL#',
+    ID_RE = /[\-.\/\\:]+/g,
     startsWith = String[PROTO].startsWith 
             ? function( s, pre, pos ){return s.startsWith(pre, pos||0);} 
             : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
@@ -296,7 +297,7 @@ function dispose_asset( asset )
 }
 
 // load javascript(s)/text(s) (a)sync in node, browser, webworker
-function load_deps( scope, cache, ref, complete )
+function load_deps( importer, scope, cache, ref, complete )
 {
     var dl = ref.length, i, t, cached,
         head, load, next, loaded = new Array( dl );
@@ -308,7 +309,13 @@ function load_deps( scope, cache, ref, complete )
             if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
             else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[ i ].cache_id ] = read_file( ref[ i ].path, 'utf8' );
             else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
-            else loaded[ i ] = require( ref[ i ].path ) || null;
+            else
+            {                
+                loaded[ i ] = require( ref[ i ].path ) || null;
+                if ( ref[ i ].cb ) // callback
+                    //          this,     id,        classname,   path,        reference
+                    ref[ i ].cb( importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ] );
+            }
         }
         return complete.apply( scope, loaded );
     }
@@ -320,7 +327,14 @@ function load_deps( scope, cache, ref, complete )
             if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
             else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[ i ].cache_id ] = read_file( ref[ i ].path, 'utf8' );
             else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
-            else { importScripts( ref[ i ].path ); loaded[ i ] = scope[ ref[ i ].name ] || null; }
+            else
+            {
+                importScripts( ref[ i ].path );
+                loaded[ i ] = scope[ ref[ i ].name ] || null;
+                if ( ref[ i ].cb ) // callback
+                    //          this,     id,        classname,   path,        reference
+                    ref[ i ].cb( importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ] );
+            }
         }
         return complete.apply( scope, loaded );
     }
@@ -395,6 +409,11 @@ function load_deps( scope, cache, ref, complete )
             if ( (cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope) )
             {
                 loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
+                
+                if ( ref[ i ].cb ) // callback
+                    //          this,     id,        classname,   path,        reference
+                    ref[ i ].cb( importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ] );
+                
                 if ( ++i >= dl ) 
                 {
                     complete.apply( scope, loaded );
@@ -417,8 +436,11 @@ function load_deps( scope, cache, ref, complete )
             else 
             { 
                 t = 0; 
-                scope[ ref[ i++ ].name ] = null;
-                next( ); 
+                scope[ ref[ i ].name ] = null;
+                if ( ref[ i ].cb ) // callback
+                    //          this,     id,        classname,   path,        reference
+                    ref[ i ].cb( importer, ref[i].id, ref[i].name, ref[i].path, null );
+                i++; next( ); 
             }
         };
         while ( i < dl && ((cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope)) ) 
@@ -577,17 +599,18 @@ Importer[PROTO] = {
                 for (i=0,l=defs.length; i<l; i++)
                 {
                     def = defs[ i ];
-                    /* 0:class, 1:id, 2:path, 3:deps */
+                    /* 0:class, 1:id, 2:path, 3:deps, 4:cb */
                     classname = def[0]; id = def[1]; path = def[2]; deps = def[3] ? def[3] : [];
                     if ( !empty( classname ) && !empty( id ) && !empty( path ) ) 
                     {
                         classes[ id ] = [
-                            /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
+                            /* 0:class, 1:id, 2:path, 3:deps, 4:loaded, 5:callback */
                             classname, 
                             id, 
                             self.path( path ), 
                             array(deps), 
-                            false
+                            false,
+                            def[4]&&is_callable(def[4]) ? def[4] : null
                         ];
                     }
                 }
@@ -597,18 +620,19 @@ Importer[PROTO] = {
                 for (i=0,l=defs.length; i<l; i++)
                 {
                     def = defs[ i ];
-                    /* 0:type, 1:id, 2:asset, 3:deps */
+                    /* 0:type, 1:id, 2:asset, 3:deps, 4:cb */
                     type = def[0]; id = def[1]; asset = def[2]; deps = def[3] ? def[3] : [];
                     if ( !empty( type ) && !empty( id ) && !empty( asset ) ) 
                     {
                         assets[ id ] = [
-                            /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded */
+                            /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded, 6:callback */
                             type[LOWER]( ), 
                             id, 
                             is_string( asset ) ? self.path_url( asset ) : asset, 
                             array(deps), 
                             false, 
-                            false
+                            false,
+                            def[4]&&is_callable(def[4]) ? def[4] : null
                         ];
                     }
                 }
@@ -664,7 +688,8 @@ Importer[PROTO] = {
                             type: 'class',
                             cache_id: 'class-' + id,
                             name: classes[id][0],
-                            path: classes[id][2]
+                            path: classes[id][2],
+                            cb: classes[id][5]
                         });
                     }
                     else
@@ -684,7 +709,7 @@ Importer[PROTO] = {
             }
             if ( exists && to_load.length )
             {
-                load_deps(Scope, cache, to_load, function( ){
+                load_deps(self, Scope, cache, to_load, function( ){
                     var i, l, args = arguments;
                     for (i=0,l=args.length; i<l; i++) cache[ to_load[ i ].cache_id ] = args[ i ];
                     if ( is_callable(complete) ) complete.call( self, cache[cache_id] );
@@ -700,7 +725,7 @@ Importer[PROTO] = {
     
     ,import_asset: function( id ) {
         var self = this, queue = [ id ], assets = self._assets, deps,
-            needs_deps, numdeps, i, dep, out = [ ], asset_def, type, asset,
+            needs_deps, numdeps, i, dep, out = [ ], asset_def, type, asset, asset_id,
             is_style, is_script, is_tpl, is_inlined, document_asset;
         while ( queue.length )
         {
@@ -733,20 +758,21 @@ Importer[PROTO] = {
                 is_script = 'scripts' === type;
                 is_tpl = 'templates' === type;
                 is_inlined = is_array( asset );
+                asset_id = id.replace(ID_RE, '_');
                 if ( is_style )
                 {
                     if ( isBrowser )
                     {
                         out.push( document_asset = is_inlined
-                            ? $$("importer-inline-style-"+id) || $$asset( 'style', asset[0] )
-                            : $$("importer-style-"+id) || $$asset( 'style-link', self.path_url(asset), true ) );
-                        document_asset[ATTR]('id', is_inlined ? "importer-inline-style-"+id : "importer-style-"+id);
+                            ? $$("importer-inline-style-"+asset_id) || $$asset( 'style', asset[0] )
+                            : $$("importer-style-"+asset_id) || $$asset( 'style-link', self.path_url(asset), true ) );
+                        document_asset[ATTR]('id', is_inlined ? "importer-inline-style-"+asset_id : "importer-style-"+asset_id);
                     }
                     else
                     {
                         out.push( is_inlined
-                                ? ("<style id=\"importer-inline-style-"+id+"\" type=\"text/css\" media=\"all\">"+asset[0]+"</style>")
-                                : ("<link id=\"importer-style-"+id+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+self.path_url(asset)+"\" media=\"all\" />")
+                                ? ("<style id=\"importer-inline-style-"+asset_id+"\" type=\"text/css\" media=\"all\">"+asset[0]+"</style>")
+                                : ("<link id=\"importer-style-"+asset_id+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+self.path_url(asset)+"\" media=\"all\" />")
                         );
                     }
                 }
@@ -755,15 +781,15 @@ Importer[PROTO] = {
                     if ( isBrowser )
                     {
                         out.push( document_asset = is_inlined
-                            ? $$("importer-inline-script-"+id) || $$asset( 'script', "/*<![CDATA[*/ "+asset[0]+" /*]]>*/" )
-                            : $$("importer-script-"+id) || $$asset( 'script-link', self.path_url(asset), true ) );
-                        document_asset[ATTR]('id', is_inlined ? "importer-inline-script-"+id : "importer-script-"+id);
+                            ? $$("importer-inline-script-"+asset_id) || $$asset( 'script', "/*<![CDATA[*/ "+asset[0]+" /*]]>*/" )
+                            : $$("importer-script-"+asset_id) || $$asset( 'script-link', self.path_url(asset), true ) );
+                        document_asset[ATTR]('id', is_inlined ? "importer-inline-script-"+asset_id : "importer-script-"+asset_id);
                     }
                     else
                     {
                         out.push( is_inlined
-                                ? ("<script id=\"importer-inline-script-"+id+"\" type=\"text/javascript\">/*<![CDATA[*/ "+asset[0]+" /*]]>*/</script>")
-                                : ("<script id=\"importer-script-"+id+"\" type=\"text/javascript\" src=\""+self.path_url(asset)+"\"></script>")
+                                ? ("<script id=\"importer-inline-script-"+asset_id+"\" type=\"text/javascript\">/*<![CDATA[*/ "+asset[0]+" /*]]>*/</script>")
+                                : ("<script id=\"importer-script-"+asset_id+"\" type=\"text/javascript\" src=\""+self.path_url(asset)+"\"></script>")
                         );
                     }
                 }
@@ -772,21 +798,24 @@ Importer[PROTO] = {
                     if ( isBrowser )
                     {
                         out.push( document_asset = is_inlined
-                            ? $$("importer-inline-tpl-"+id) || $$asset( 'tpl', asset[0] )
-                            : $$("importer-inline-tpl-"+id) || $$asset( 'tpl', self.getFile(asset) ) );
-                        document_asset[ATTR]('id', is_inlined ? "importer-inline-tpl-"+id : "importer-inline-tpl-"+id);
+                            ? $$("importer-inline-tpl-"+asset_id) || $$asset( 'tpl', asset[0] )
+                            : $$("importer-inline-tpl-"+asset_id) || $$asset( 'tpl', self.getFile(asset) ) );
+                        document_asset[ATTR]('id', is_inlined ? "importer-inline-tpl-"+asset_id : "importer-inline-tpl-"+asset_id);
                     }
                     else
                     {
                         out.push( is_inlined
-                                ? ("<script id=\"importer-inline-tpl-"+id+"\" type=\"text/x-tpl\">"+asset[0]+"</script>")
-                                : ("<script id=\"importer-inline-tpl-"+id+"\" type=\"text/x-tpl\">"+self.getFile(asset)+"</script>")
+                                ? ("<script id=\"importer-inline-tpl-"+asset_id+"\" type=\"text/x-tpl\">"+asset[0]+"</script>")
+                                : ("<script id=\"importer-inline-tpl-"+asset_id+"\" type=\"text/x-tpl\">"+self.getFile(asset)+"</script>")
                         );
                     }
                 }
                 else
                 {
-                    out.push( is_inlined ? asset[0] : self.getFile(asset) );
+                    if ( asset_def[6] ) // callback
+                        out.push( asset_def[6](self, 'output', type, id, asset) || '' );
+                    else
+                        out.push( is_inlined ? asset[0] : self.getFile(asset) );
                 }
                 asset_def[5] = true; // loaded
             }
@@ -798,18 +827,22 @@ Importer[PROTO] = {
         return out;
     }
     
-    ,enqueue: function( type, id, asset, deps ) {
+    ,enqueue: function( type, id, asset, deps, cb ) {
         var self = this, assets = self._assets;
         if ( !empty(type) && !empty(id) )
         {
             if ( assets[HAS](id) ) 
             {
                 assets[id][4] = true; // enqueued
+                if ( assets[id][6] ) // callback
+                    assets[id][6](self, 'enqueue', type, id, assets[id][2]);
             }
             else if ( !empty(asset) ) 
             {
-                self.register("assets", [type, id, asset, deps]);
-                self._assets[id][4] = true; // enqueued
+                self.register("assets", [type, id, asset, deps, cb]);
+                assets[id][4] = true; // enqueued
+                if ( assets[id][6] ) // callback
+                    assets[id][6](self, 'enqueue', type, id, assets[id][2]);
             }
         }
         return self;

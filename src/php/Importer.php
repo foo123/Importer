@@ -167,17 +167,18 @@ class Importer
             {
                 foreach ($defs as $def)
                 {
-                    /* 0:class, 1:id, 2:path, 3:deps */
+                    /* 0:class, 1:id, 2:path, 3:deps, 4:cb */
                     $classname = $def[0]; $id = $def[1]; $path = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     if ( !empty( $classname ) && !empty( $id ) && !empty( $path ) ) 
                     {
                         $this->_classes[ $id ] = array(
-                            /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
+                            /* 0:class, 1:id, 2:path, 3:deps, 4:loaded, 5:callback */
                             $classname, 
                             $id, 
                             $this->path( $path ), 
                             (array)$deps, 
-                            false
+                            false,
+                            !empty($def[4])&&is_callable($def[4]) ? $def[4] : null
                         );
                     }
                 }
@@ -186,19 +187,20 @@ class Importer
             {
                 foreach ($defs as $def)
                 {
-                    /* 0:type, 1:id, 2:asset, 3:deps */
+                    /* 0:type, 1:id, 2:asset, 3:deps, 4:cb */
                     $type = $def[0]; $id = $def[1]; $asset = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     if ( !empty( $type ) && !empty( $id ) && !empty( $asset ) ) 
                     {
                         $this->_assets[ $id ] = array(
-                            /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded */
+                            /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded, 6:callback */
                             strtolower($type), 
                             $id, 
                             // maybe literal asset
                             is_string( $asset ) ? $this->path_url( $asset ) : $asset,
                             (array)$deps, 
                             false, 
-                            false
+                            false,
+                            !empty($def[4])&&is_callable($def[4]) ? $def[4] : null
                         );
                     }
                 }
@@ -210,7 +212,7 @@ class Importer
                 {
                     foreach ($defs as $def)
                     {
-                        /* 0:id, 1:path, 2:deps */
+                        /* 0:id, 1:path, 2:deps, 3:cb */
                         $id = $def[0]; $path = $def[1]; $deps = isset($def[2]) ? $def[2] : array();
                         if ( !empty( $id ) && !empty( $path ) ) 
                         {
@@ -279,6 +281,13 @@ class Importer
                     $this->_classes[$id][4] = true;
                     if ( false === $require ) @include( $this->_classes[$id][2] );
                     else require( $this->_classes[$id][2] );
+                    // callback
+                    if ( !empty($this->_classes[$id][5]) )
+                        call_user_func( 
+                            $this->_classes[$id][5],
+                            // $importer, $id,      $classname,   $path
+                            $this, $id, $this->_classes[$id][0], $this->_classes[$id][2]
+                        );
                 }
             }
             else
@@ -345,7 +354,18 @@ class Importer
                 }
                 else
                 {
-                    $out[] = $is_inlined ? $asset[0] : $this->getFile($asset);
+                    if ( $asset_def[6] ) // callback
+                    {
+                        $ret = call_user_func(
+                            $asset_def[6],
+                            $this, 'output', $type, $id, $asset
+                        );
+                        $out[] = !empty($ret) ? $ret : '';
+                    }
+                    else
+                    {
+                        $out[] = $is_inlined ? $asset[0] : $this->getFile($asset);
+                    }
                 }
                 $asset_def[5] = true; // loaded
             }
@@ -357,18 +377,28 @@ class Importer
         return $out;
     }
     
-    public function enqueue( $type, $id, $asset=null, $deps=array() )
+    public function enqueue( $type, $id, $asset=null, $deps=array(), $cb=null )
     {
         if ( !empty( $type ) && !empty( $id ) )
         {
             if ( isset( $this->_assets[$id] ) ) 
             {
                 $this->_assets[$id][4] = true; // enqueued
+                if ( $this->_assets[$id][6] ) // callback
+                    call_user_func(
+                        $this->_assets[$id][6],
+                        $this, 'enqueue', $type, $id, $this->_assets[$id][2]
+                    );
             }
             elseif ( !empty( $asset ) ) 
             {
-                $this->register("assets", array($type, $id, $asset, $deps));
+                $this->register("assets", array($type, $id, $asset, $deps, $cb));
                 $this->_assets[$id][4] = true; // enqueued
+                if ( $this->_assets[$id][6] ) // callback
+                    call_user_func(
+                        $this->_assets[$id][6],
+                        $this, 'enqueue', $type, $id, $this->_assets[$id][2]
+                    );
             }
         }
         return $this;
