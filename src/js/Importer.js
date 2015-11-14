@@ -2,7 +2,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/JS
 *
-*  @version 0.1
+*  @version 0.2.0
 *  https://github.com/foo123/Importer
 **/
 !function( root, name, factory ) {
@@ -29,13 +29,8 @@ else if ( !(name in root) )
     /* module factory */        function( exports, undef ) {
 "use strict";
 
-var scope = isNode ? global : this,
-    PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', toString = Object[PROTO].toString, 
-    map = Array[PROTO].map,
-    
-    isNode = ("undefined" !== typeof global) && ("[object global]" === toString.call(global)),
-    isBrowser = !isNode && ("undefined" !== typeof navigator), 
-    isWebWorker = !isNode && ("function" === typeof importScripts) && (navigator instanceof WorkerNavigator),
+var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute',
+    toString = Object[PROTO].toString, map = Array[PROTO].map,
     
     is_callable = function( o ){ return "function" === typeof o; },
     is_string = function( o ){ return o instanceof String || '[object String]' === toString.call(o); },
@@ -51,92 +46,201 @@ var scope = isNode ? global : this,
             ? function( s, pre, pos ){return s.startsWith(pre, pos||0);} 
             : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
     DS = '/', DS_RE = /\/|\\/g, PROTOCOL = '://', PROTOCOL_RE = '#PROTOCOL#',
+    
+    isNode = ("undefined" !== typeof global) && ("[object global]" === toString.call(global)),
+    isWebWorker = !isNode && ('undefined' !== typeof WorkerGlobalScope) && ("function" === typeof importScripts) && (navigator instanceof WorkerNavigator),
+    isBrowser = !isNode && !isWebWorker && ("undefined" !== typeof navigator), 
+    
+    Scope = isNode ? global : this,
+    
+    read_file = isNode
+    ? function( path, enc ) {
+        return require('fs').readFileSync(path, {encoding:enc})/*.toString()*/;
+    }
+    : function( path, enc ) {
+        var xmlhttp = window.XMLHttpRequest
+            // code for IE7+, Firefox, Chrome, Opera, Safari
+            ? new XMLHttpRequest( )
+            // code for IE6, IE5
+            : new ActiveXObject("Microsoft.XMLHTTP") // or ActiveXObject("Msxml2.XMLHTTP"); ??
+        ;
+        
+        // plain text with enc encoding format
+        xmlhttp.open('GET', path, false);  // 'false' makes the request synchronous
+        xmlhttp.setRequestHeader("Content-Type", "text/plain; charset="+enc+"");
+        xmlhttp.overrideMimeType("text/plain; charset="+enc+"");
+        // http://stackoverflow.com/questions/9855127/setting-xmlhttprequest-responsetype-forbidden-all-of-a-sudden
+        //xmlhttp.responseType = "text";
+        xmlhttp.send(null);
+        return 200 === xmlhttp.status ? xmlhttp.responseText : '';
+    },
+    read_file_async = isNode
+    ? function( path, enc, cb ) {
+        require('fs').readFile(path, {encoding:enc}, function( err, text ){
+            if ( cb ) cb( !!err ? '' : text );
+        });
+        return '';
+    }
+    : function( path, enc, cb ) {
+        var xmlhttp = window.XMLHttpRequest
+            // code for IE7+, Firefox, Chrome, Opera, Safari
+            ? new XMLHttpRequest( )
+            // code for IE6, IE5
+            : new ActiveXObject("Microsoft.XMLHTTP") // or ActiveXObject("Msxml2.XMLHTTP"); ??
+        ;
+        
+        // plain text with enc encoding format
+        xmlhttp.open('GET', path, true);  // 'true' makes the request asynchronous
+        xmlhttp.setRequestHeader("Content-Type", "text/plain; charset="+enc+"");
+        xmlhttp.overrideMimeType("text/plain; charset="+enc+"");
+        xmlhttp.responseType = "text";
+        xmlhttp.onload = function( ) {
+            if ( cb )
+                cb( 200 === xmlhttp.status ? xmlhttp.responseText : '' );
+        };
+        xmlhttp.send(null);
+        return '';
+    },
+    
     Importer
 ;
 
-/*
-// adapted from http://davidwalsh.name/add-rules-stylesheets
-function addCSSRule( style, selector, rules, index ) 
+// http://davidwalsh.name/add-rules-stylesheets
+function add_css( style, css ) 
 {
-    if ( "insertRule" in style.sheet ) 
-    {
-        style.sheet.insertRule( selector + "{" + rules + "}", index );
-        return style.sheet.cssRules[ index ];
-    }
-    else if ( "addRule" in style.sheet ) 
-    {
-        style.sheet.addRule( selector, rules, index );
-        return style.sheet.rules[ index ];
-    }
-}
-
-function addCSS( style, css ) 
-{
-    var css_type = typeof css;
+    var css_type = typeof css, n, index, declaration, selector, rules;
     
     // css rules object
     if ( "object" === css_type )
     {
-        var n, declaration, i = 0;
+        index = 0;
         for (n in css)
         {
             if ( !css[HAS](n) ) continue;
             declaration = css[ n ];
-            declaration.css = addCSSRule( style, declaration.selector, [].concat(declaration.rules).join('; '), i++ );
+            selector = declaration.selector;
+            rules = [].concat(declaration.rules).join('; ');
+            if ( "insertRule" in style.sheet ) 
+            {
+                style.sheet.insertRule( selector + "{" + rules + "}", index );
+                declaration.css = style.sheet.cssRules[ index ];
+            }
+            else if ( "addRule" in style.sheet ) 
+            {
+                style.sheet.addRule( selector, rules, index );
+                declaration.css = style.sheet.rules[ index ];
+            }
+            index++;
         }
     }
     // css literal string
     else if ( "string" === css_type )
     {
-        if ( style.styleSheet ) style.styleSheet.cssText = (style.styleSheet.cssText||'') + "\n" + css;
-        else style.appendChild( document.createTextNode( "\n" + css ) );
+        if ( style.styleSheet ) style.styleSheet.cssText = (style.styleSheet.cssText||'') + css;
+        else style.appendChild( document.createTextNode( css ) );
     }
     return css;
 }
-*/
 
-function createAsset( type, src ) 
+function create_asset( type, src, unique )
 {
-    var asset = null;
+    var asset = null, link = null, i, links;
     switch( type )
     {
-        // external script
-        case "script-link":
+        // external tpl
+        case "tpl-link":
+        // literal tpl
+        case "tpl":
             // Create the <script> tag
-            asset = document.createElement('script');
-            asset[ATTR]("type", "text/javascript");
-            asset[ATTR]("language", "javascript");
+            asset = document.createElement("script");
+            asset[ATTR]("type", "text/x-tpl");
+            // WebKit hack :(
+            asset.appendChild( document.createTextNode(src) );
             // Add the <script> element to the page
             document.head.appendChild( asset );
-            asset[ATTR]("src", src);
+            break;
+            
+        // external script
+        case "script-link":
+            if ( unique )
+            {
+                // external script, only if not exists
+                links = document.head.getElementsByTagName("script");
+                for (i=links.length-1; i>=0; i--) 
+                {
+                    if ( links[i].src && src === links[i].src ) 
+                    {
+                        // found existing link
+                        link = links[ i ];
+                        break;
+                    }
+                }
+            }
+            if ( link )
+            {
+                // return it, instead
+                asset = link;
+            }
+            else
+            {
+                // Create the <script> tag
+                asset = document.createElement('script');
+                asset[ATTR]("type", "text/javascript");
+                asset[ATTR]("language", "javascript");
+                asset[ATTR]("src", src);
+                // Add the <script> element to the page
+                document.head.appendChild( asset );
+            }
             break;
         
-        // inline script
+        // literal script
         case "script":
             // Create the <script> tag
             asset = document.createElement("script");
             asset[ATTR]("type", "text/javascript");
             asset[ATTR]("language", "javascript");
             // WebKit hack :(
-            asset.appendChild( document.createTextNode( src ) );
+            asset.appendChild( document.createTextNode(src) );
             // Add the <script> element to the page
             document.head.appendChild( asset );
             break;
             
         // external stylesheet
         case "style-link":
-            // Create the <link> tag
-            asset = document.createElement('link');
-            // Add a media (and/or media query) here if you'd like!
-            asset[ATTR]("type", "text/css");
-            asset[ATTR]("rel", "stylesheet");
-            asset[ATTR]("media", "all");
-            asset[ATTR]("href", src);
-            // Add the <style> element to the page
-            document.head.appendChild( asset );
+            if ( unique )
+            {
+                // external stylesheet, only if not exists
+                links = document.head.getElementsByTagName("link");
+                for (i=links.length-1; i>=0; i--) 
+                {
+                    if ( src === links[i].href ) 
+                    {
+                        // found existing link
+                        link = links[ i ];
+                        break;
+                    }
+                }
+            }
+            if ( link )
+            {
+                // return it, instead
+                asset = link;
+            }
+            else
+            {
+                // Create the <link> tag
+                asset = document.createElement('link');
+                // Add a media (and/or media query) here if you'd like!
+                asset[ATTR]("type", "text/css");
+                asset[ATTR]("rel", "stylesheet");
+                asset[ATTR]("media", "all");
+                asset[ATTR]("href", src);
+                // Add the <style> element to the page
+                document.head.appendChild( asset );
+            }
             break;
         
-        // inline stylesheet
+        // literal stylesheet
         case "style":
         default:
             // Create the <style> tag
@@ -147,37 +251,32 @@ function createAsset( type, src )
             // WebKit hack :(
             asset.appendChild( document.createTextNode("") );
             // Add the <style> element to the page
-            if ( asset.styleSheet ) asset.styleSheet.cssText = (asset.styleSheet.cssText||'') + "\n" + src;
-            else asset.appendChild( document.createTextNode( "\n" + src ) );
             document.head.appendChild( asset );
+            if ( src ) add_css( asset, src );
             break;
     }
     return asset;
 }
 
-function disposeAsset( asset ) 
+function dispose_asset( asset ) 
 {
     if ( asset ) 
         document.head.removeChild( asset );
 }
 
-function loadAssets( scope, names, paths, complete )
+// load javascript(s)/text(s) (a)sync in node, browser, webworker
+function load_deps( scope, cache, ref, complete )
 {
-}
-
-// load javascript(s) (a)sync in node, browser, webworker
-function loadClasses( scope, cache, ids, names, paths, complete )
-{
-    var dl = names.length, i, t, cached,
+    var dl = ref.length, i, t, cached,
         head, load, next, loaded = new Array( dl );
     // nodejs, require
     if ( isNode )
     {
         for (i=0; i<dl; i++) 
         {
-            if ( cache[HAS](ids[ i ]) ) loaded[ i ] = cache[ ids[ i ] ];
-            else if ( names[ i ] in scope ) loaded[ i ] = scope[ names[ i ] ];
-            else loaded[ i ] = require( paths[ i ] ) || null;;
+            if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
+            else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
+            else loaded[ i ] = require( ref[ i ].path ) || null;
         }
         return complete.apply( scope, loaded );
     }
@@ -186,9 +285,9 @@ function loadClasses( scope, cache, ids, names, paths, complete )
     {
         for (i=0; i<dl; i++) 
         {
-            if ( cache[HAS](ids[ i ]) ) loaded[ i ] = cache[ ids[ i ] ];
-            else if ( names[ i ] in scope ) loaded[ i ] = scope[ names[ i ] ];
-            else { importScripts( paths[ i ] ); loaded[ i ] = scope[ names[ i ] ] || null; }
+            if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
+            else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
+            else { importScripts( ref[ i ].path ); loaded[ i ] = scope[ ref[ i ].name ] || null; }
         }
         return complete.apply( scope, loaded );
     }
@@ -219,47 +318,48 @@ function loadClasses( scope, cache, ids, names, paths, complete )
                     next( );
                 }
                 // load it
+                //script.src = path;
+                script[ATTR]('src', path);
                 head.appendChild( script ); 
-                script.src = path;
             }
         };
         next = function next( ) {
             var cached;
-            if ( (cached=cache[HAS](ids[ i ])) || (names[ i ] in scope) )
+            if ( (cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope) )
             {
-                loaded[ i ] = (cached ? cache[ ids[ i ] ] : scope[ names[ i ] ]) || null;
+                loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
                 if ( ++i >= dl ) 
                 {
                     complete.apply( scope, loaded );
                 }
-                else if ( (cached=cache[HAS](ids[ i ])) || (names[ i ] in scope) ) 
+                else if ( (cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope) ) 
                 {
-                    loaded[ i ] = (cached ? cache[ ids[ i ] ] : scope[ names[ i ] ]) || null;
+                    loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
                     next( ); 
                 }
                 else
                 {                    
-                    scope[ names[ i ] ] = null;
-                    load( ids[ i ], paths[ i ], next );
+                    scope[ ref[ i ].name ] = null;
+                    load( ref[ i ].cache_id, ref[ i ].path, next );
                 }
             }
-            else if ( ++t < 10 ) 
+            else if ( ++t < 4 ) 
             { 
-                setTimeout( next, 30 ); 
+                setTimeout( next, 20 ); 
             }
             else 
             { 
                 t = 0; 
-                scope[ names[ i++ ] ] = null;
+                scope[ ref[ i++ ].name ] = null;
                 next( ); 
             }
         };
-        while ( i < dl && ((cached=cache[HAS](ids[ i ])) || (names[ i ] in scope)) ) 
+        while ( i < dl && ((cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope)) ) 
         {
-            loaded[ i ] = (cached ? cache[ ids[ i ] ] : scope[ names[ i ] ]) || null;
+            loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
             i++;
         }
-        if ( i < dl ) load( ids[ i ], paths[ i ], next );
+        if ( i < dl ) load( ref[ i ].cache_id, ref[ i ].path, next );
         else complete.apply( scope, loaded );
     }
 }
@@ -269,7 +369,7 @@ function remove_protocol( p )
     return p.split( PROTOCOL ).join( PROTOCOL_RE );
 }
 
-function add_protocol( $p )
+function add_protocol( p )
 {
     return p.split( PROTOCOL_RE ).join( PROTOCOL );
 }
@@ -329,33 +429,34 @@ function join_path( )
 Importer = function Importer( base, base_url ) {
     var self = this;
     if ( !(self instanceof Importer) ) return new Importer( base, base_url );
-    self.classes = { };
-    self.assets = { };
     self.base = '';
     self.base_url = '';
     self.base_path( base, base_url );
+    self._classes = { };
+    self._assets = { };
     self._cache = { };
 };
 
-Importer.VERSION = '0.1';
+Importer.VERSION = '0.2.0';
+Importer.BASE = './';
 Importer.join_path = join_path;
 
 Importer[PROTO] = {
     constructor: Importer
     
-    ,classes: null
-    ,assets: null
     ,base: null
     ,base_url: null
+    ,_classes: null
+    ,_assets: null
     ,_cache: null
     
     ,dispose: function( ) {
         var self = this;
-        self.classes = null;
-        self.assets = null;
+        self._classes = null;
+        self._assets = null;
+        self._cache = null;
         self.base = null;
         self.base_url = null;
-        self._cache = null;
         return self;
     }
     
@@ -388,17 +489,18 @@ Importer[PROTO] = {
     }
     
     ,path: function( asset ) {
-        return this.get_path( asset||'', isNode ? this.base : this.base_url );
+        var self = this;
+        return self.get_path( asset||'', isNode ? self.base : self.base_url );
     }
     
     ,path_url: function( asset ) {
-        return this.get_path( asset||'', this.base_url );
+        var self = this;
+        return self.get_path( asset||'', self.base_url );
     }
     
     ,register: function( what, defs ) {
-        var self = this, classes = self.classes, assets = self.assets,
-            i, l,
-            classname, def, id, path, deps, type, asset;
+        var self = this, classes = self._classes, assets = self._assets,
+            i, l, classname, def, id, path, deps, type, asset;
         if ( is_array( defs ) && defs.length )
         {
             if ( !is_array( defs[0] ) ) defs = [defs]; // make array of arrays
@@ -410,7 +512,7 @@ Importer[PROTO] = {
                     def = defs[ i ];
                     /* 0:class, 1:id, 2:path, 3:deps */
                     classname = def[0]; id = def[1]; path = def[2]; deps = def[3] ? def[3] : [];
-                    if ( !empty( classname ) && empty( id ) && empty( path ) ) 
+                    if ( !empty( classname ) && !empty( id ) && !empty( path ) ) 
                     {
                         classes[ id ] = [
                             /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
@@ -432,7 +534,7 @@ Importer[PROTO] = {
                     type = def[0]; id = def[1]; asset = def[2]; deps = def[3] ? def[3] : [];
                     if ( !empty( type ) && !empty( id ) && !empty( asset ) ) 
                     {
-                        assets[ id ] = array(
+                        assets[ id ] = [
                             /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded */
                             type.toLowerCase( ), 
                             id, 
@@ -440,7 +542,7 @@ Importer[PROTO] = {
                             array(deps), 
                             false, 
                             false
-                        );
+                        ];
                     }
                 }
             }
@@ -449,10 +551,9 @@ Importer[PROTO] = {
     }
     
     ,import_class: function( id, complete ) {
-        var self = this, queue, classes = self.classes,
-            cache_id = 'importer-script-'+id, cache = self._cache, exists,
-            needs_deps, numdeps, i, dep, deps,
-            to_load_ids, to_load_names, to_load_paths;
+        var self = this, queue, classes = self._classes,
+            cache_id = 'class-'+id, cache = self._cache, exists,
+            needs_deps, numdeps, i, dep, deps, to_load;
         
         if ( cache[HAS](cache_id) ) 
         {
@@ -462,7 +563,7 @@ Importer[PROTO] = {
         else
         {
             exists = false;
-            to_load_ids = [ ]; to_load_names = [ ]; to_load_paths = [ ];
+            to_load = [ ];
             queue = [ id ];
             while ( queue.length )
             {
@@ -471,7 +572,7 @@ Importer[PROTO] = {
                 if ( classes[HAS](id) && !classes[id][4] )
                 {
                     exists = true;
-                    if ( !scope[HAS]( classes[id][0] ) )
+                    if ( !Scope[HAS]( classes[id][0] ) )
                     {
                         deps = classes[id][3];
                         if ( !empty(deps) )
@@ -491,13 +592,16 @@ Importer[PROTO] = {
                             else queue.shift( );
                         }
                         classes[id][4] = true;
-                        to_load_ids.unshift( 'importer-script-' + id );
-                        to_load_names.unshift( classes[id][0] );
-                        to_load_paths.unshift( classes[id][2] );
+                        to_load.push({
+                            id: id,
+                            cache_id: 'class-' + id,
+                            name: classes[id][0],
+                            path: classes[id][2]
+                        });
                     }
                     else
                     {
-                        cache[ 'importer-script-' + id ] = scope[ classes[id][0] ];
+                        cache[ 'class-' + id ] = Scope[ classes[id][0] ];
                     }
                 }
                 else if ( classes[HAS](id) )
@@ -510,13 +614,12 @@ Importer[PROTO] = {
                     queue.shift( );
                 }
             }
-            if ( exists && to_load_ids.length )
+            if ( exists && to_load.length )
             {
-                loadClasses(scope, cache, ids, names, paths, function( ){
-                    var i, l;
-                    for (i=0,l=arguments.length; i<l; i++) cache[ ids[ i ] ] = arguments[ i ];
-                    if ( is_callable(complete) )
-                        complete.call( self, cache[cache_id] );
+                load_deps(Scope, cache, to_load, function( ){
+                    var i, l, args = arguments;
+                    for (i=0,l=args.length; i<l; i++) cache[ to_load[ i ].cache_id ] = args[ i ];
+                    if ( is_callable(complete) ) complete.call( self, cache[cache_id] );
                 });
             }
             else if ( is_callable(complete) )
@@ -527,10 +630,10 @@ Importer[PROTO] = {
         return self;
     }
     
-    ,import_asset: function( id, complete ) {
-        var self = this, queue = [ id ], assets = self.assets, deps,
+    ,import_asset: function( id ) {
+        var self = this, queue = [ id ], assets = self._assets, deps,
             needs_deps, numdeps, i, dep, out = [ ], asset_def, type, asset,
-            isStyle, isScript, isLiteral;
+            is_style, is_script, is_tpl, is_inlined, document_asset;
         while ( queue.length )
         {
             id = queue[ 0 ];
@@ -548,7 +651,7 @@ Importer[PROTO] = {
                     for (i=numdeps-1; i>=0; i--)
                     {
                         dep = deps[i];
-                        if ( assets[HAS](dep) ) && !assets[dep][5] )
+                        if ( assets[HAS](dep) && !assets[dep][5] )
                         {
                             assets[dep][4] = true; // enqueued
                             needs_deps = true;
@@ -558,29 +661,64 @@ Importer[PROTO] = {
                     if ( needs_deps ) continue;
                     else queue.shift( );
                 }
-                isStyle = 'styles' === type;
-                isScript = 'scripts' === type;
-                isLiteral = is_array( asset );
-                if ( isStyle )
+                is_style = 'styles' === type;
+                is_script = 'scripts' === type;
+                is_tpl = 'templates' === type;
+                is_inlined = is_array( asset );
+                if ( is_style )
                 {
-                    out.push( isLiteral 
-                            ? ("<style id=\"importer-inline-style-"+id+"\" type=\"text/css\" media=\"all\">"+asset[0]+"</style>")
-                            : ("<link id=\"importer-style-"+id+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+asset+"\" media=\"all\" />")
-                    );
+                    if ( isBrowser )
+                    {
+                        out.push( document_asset = is_inlined
+                            ? document.getElementById("importer-inline-style-"+id) || create_asset( 'style', asset[0] )
+                            : document.getElementById("importer-style-"+id) || create_asset( 'style-link', asset, true ) );
+                        document_asset[ATTR]('id', is_inlined ? "importer-inline-style-"+id : "importer-style-"+id);
+                    }
+                    else
+                    {
+                        out.push( is_inlined
+                                ? ("<style id=\"importer-inline-style-"+id+"\" type=\"text/css\" media=\"all\">"+asset[0]+"</style>")
+                                : ("<link id=\"importer-style-"+id+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+asset+"\" media=\"all\" />")
+                        );
+                    }
                 }
-                else if ( isScript )
+                else if ( is_script )
                 {
-                    out.push( isLiteral 
-                            ? ("<script id=\"importer-inline-script-"+id+"\" type=\"text/javascript\">/*<![CDATA[*/ "+asset[0]+" /*]]>*/</script>")
-                            : ("<script id=\"importer-script-"+id+"\" type=\"text/javascript\" src=\""+asset+"\"></script>")
-                    );
+                    if ( isBrowser )
+                    {
+                        out.push( document_asset = is_inlined
+                            ? document.getElementById("importer-inline-script-"+id) || create_asset( 'script', "/*<![CDATA[*/ "+asset[0]+" /*]]>*/" )
+                            : document.getElementById("importer-script-"+id) || create_asset( 'script-link', asset, true ) );
+                        document_asset[ATTR]('id', is_inlined ? "importer-inline-script-"+id : "importer-script-"+id);
+                    }
+                    else
+                    {
+                        out.push( is_inlined
+                                ? ("<script id=\"importer-inline-script-"+id+"\" type=\"text/javascript\">/*<![CDATA[*/ "+asset[0]+" /*]]>*/</script>")
+                                : ("<script id=\"importer-script-"+id+"\" type=\"text/javascript\" src=\""+asset+"\"></script>")
+                        );
+                    }
+                }
+                else if ( is_tpl )
+                {
+                    if ( isBrowser )
+                    {
+                        out.push( document_asset = is_inlined
+                            ? document.getElementById("importer-inline-tpl-"+id) || create_asset( 'tpl', asset[0] )
+                            : document.getElementById("importer-tpl-"+id) || create_asset( 'tpl-link', asset, true ) );
+                        document_asset[ATTR]('id', is_inlined ? "importer-inline-tpl-"+id : "importer-tpl-"+id);
+                    }
+                    else
+                    {
+                        out.push( is_inlined
+                                ? ("<script id=\"importer-inline-tpl-"+id+"\" type=\"text/x-tpl\">"+asset[0]+"</script>")
+                                : ("<script id=\"importer-tpl-"+id+"\" type=\"text/x-tpl\">"+asset+"</script>")
+                        );
+                    }
                 }
                 else
                 {
-                    out.push( isLiteral 
-                            ? asset[0]
-                            : asset
-                    );
+                    out.push( is_inlined ? asset[0] : asset );
                 }
                 asset_def[5] = true; // loaded
             }
@@ -593,7 +731,7 @@ Importer[PROTO] = {
     }
     
     ,enqueue: function( type, id, asset, deps ) {
-        var self = this, assets = self.assets;
+        var self = this, assets = self._assets;
         if ( !empty(type) && !empty(id) )
         {
             if ( assets[HAS](id) ) 
@@ -603,82 +741,120 @@ Importer[PROTO] = {
             else if ( !empty(asset) ) 
             {
                 self.register("assets", [type, id, asset, deps]);
-                self.assets[id][4] = true; // enqueued
+                self._assets[id][4] = true; // enqueued
             }
         }
         return self;
     }
     
-    ,assets: function( type, complete ) {
-        var self = this, out, assets = self.assets, next,
+    ,assets: function( type ) {
+        var self = this, out, assets = self._assets, next,
             id, asset_def, i, l, to_load = [ ];
-        if ( undef === type ) type = "scripts";
+        if ( !arguments.length ) type = "scripts";
         type = type.toLowerCase( );
         for (id in assets)
         {
             if ( !assets[HAS](id) ) continue;
-            assets_def = assets[id];
+            asset_def = assets[id];
             if ( type === asset_def[0] && asset_def[4] && !asset_def[5] )
             {
                 to_load.push( asset_def[1] );
             }
         }
-        if ( isNode )
+        if ( isBrowser )
+        {
+            for (i=0,l=to_load.length; i<l; i++)
+                self.import_asset( to_load[i] );
+            out = '';
+        }
+        else //if ( isNode || isWebWorker )
         {
             out = [ ];
             for (i=0,l=to_load.length; i<l; i++)
-                out = out.concat( self.import_asset(asset_def[1]) );
+                out = out.concat( self.import_asset( to_load[i] ) );
             out = out.join("\n");
-            if ( is_callable(complete) ) complete.call( self );
-            return out;
         }
-        else if ( isBrowser && !isWebWorker )
-        {
-            i = 0; l = to_load.length;
-            next = function( ) {
-                if ( ++i < l ) self.import_asset( to_load[ i ], next );
-                else if ( is_callable(complete) ) complete.call( self );
-            };
-            if ( i < l ) self.import_asset( to_load[ i ], next );
-            else if ( is_callable(complete) ) complete.call( self );
-        }
-        else if ( is_callable(complete) ) complete.call( self );
-        return '';
+        return out;
     }
     
-    ,import: function( classname, path, deps, complete ) {
-        var self = this;
-        if ( !complete && is_callable(deps) ) 
+    ,getFile: function( path, opts, complete ) {
+        var self = this, encoding;
+        path = self.path( path );
+        opts = opts || { };
+        encoding = opts.encoding || 'utf8';
+        complete = complete || opts.complete || (is_callable( opts ) && opts);
+        if ( isBrowser )
+        {
+            return read_file_async(path, encoding, function( data ){
+                if ( is_callable( complete ) ) complete( data );
+            })
+        }
+        else
+        {
+            return is_callable( complete )
+            ? read_file_async( path, encoding, complete )
+            : read_file( path, encoding );
+        }
+    }
+    
+    ,importClass: function( classname, path, deps, complete ) {
+        var self = this, argslen = arguments.length;
+        if ( argslen < 4 && is_callable(deps) ) 
         {
             complete = deps;
             deps = null;
         }
-        else if ( !complete && is_callable(path) ) 
+        else if ( argslen < 3 && is_callable(path) ) 
         {
             complete = path;
             path = null;
+            deps = null;
         }
-        if ( !self.classes[HAS](classname) && !empty(path) )
-            self.register("classes", [classname, classname, self.path(path+".js"), deps));
-        if ( self.classes[HAS](classname) && !self.classes[classname][4] /*&& file_exists( $this->classes[$class][2] )*/ )
-            self.import_class(classname);
+        if ( !self._classes[HAS](classname) && !empty(path) )
+            self.register("classes", [classname, classname, self.path(path+".js"), deps]);
+        if ( self._classes[HAS](classname) && !self._classes[classname][4] )
+            self.import_class( classname, complete );
+        else if ( is_callable(complete) )
+            complete.call( self, self._cache['class-'+classname]||null );
         return self;
     }
     
     ,importAll: function( classnames, complete ) {
-        var self = this, i, l;
-        if ( empty(classnames) ) return self;
-        classnames = array(classnames);
-        if ( isNode || isWebWorker )
-        {
-            for (i=0,l=classnames.length; i<l; i++) self.import( classnames[i] );
-            if ( is_callable(complete) ) complete.call( self );
-        }
-        else
-        {
-        }
+        var self = this, i, l, c, loader;
+        classnames = array( classnames ); l = classnames.length;
+        c = new Array( l ); i = 0;
+        loader = function loader( loaded ) {
+            if ( arguments.length )
+            {
+                c[ i ] = loaded || null;
+                i++;
+            }
+            if ( i < l ) self.import_class( classnames[i], loader );
+            else if ( is_callable(complete) )
+            {
+                setTimeout(function( ){
+                    complete.apply( self, c );
+                }, 10);
+            }
+        };
+        loader( );
         return self;
     }
+}
+
+if ( isNode )
+{
+    Importer.BASE = __dirname;
+}
+else if ( isWebWorker )
+{
+    Importer.BASE = this.location.href.split('/').slice(0,-1).join('/');
+}
+else
+{
+    var this_script = document.getElementsByTagName('script'), link = document.createElement('a');
+    link.href = this_script[this_script.length-1].src||'./'; // absolute uri
+    Importer.BASE = link.href.split('/').slice(0,-1).join('/');
 }
 
 // export it

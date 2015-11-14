@@ -1,0 +1,11 @@
+Test1.php
+Test2.php
+<?php
+
+class Test1
+{
+}
+echo 'Test1.php' . PHP_EOL;
+<link id="importer-style-asset1" type="text/css" rel="stylesheet" href="assets/asset1.css" media="all" />
+<link id="importer-style-asset2" type="text/css" rel="stylesheet" href="assets/asset2.css" media="all" />
+<style id="importer-inline-style-asset3" type="text/css" media="all">/* asset 3 */</style>

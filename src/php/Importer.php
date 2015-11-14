@@ -3,19 +3,21 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/JS
 *
-*  @version 0.1
+*  @version 0.2.0
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer') )
 { 
 class Importer
 {
-    const VERSION = '0.1';
+    const VERSION = '0.2.0';
     
     const DS = '/';
     const DS_RE = '/\\/|\\\\/';
     const PROTOCOL = '://';
     const PROTOCOL_RE = '#PROTOCOL#';
+    
+    public static $BASE = './';
     
     // simulate python's "startswith" string method
     public static function startsWith( $str, $pre, $pos=0 ) 
@@ -86,10 +88,10 @@ class Importer
         return ($isAbsolute === $DS ? $DS : "") . self::add_protocol( $path );
     }
     
-    private $classes = null;
-    private $assets = null;
     private $base = null;
     private $base_url = null;
+    private $_classes = null;
+    private $_assets = null;
     
     public static function _( $base='', $base_url='' )
     {
@@ -98,8 +100,8 @@ class Importer
     
     public function __construct( $base='', $base_url='' )
     {
-        $this->classes = array( );
-        $this->assets = array( );
+        $this->_classes = array( );
+        $this->_assets = array( );
         $this->base = '';
         $this->base_url = '';
         $this->base_path( $base, $base_url );
@@ -112,8 +114,8 @@ class Importer
     
     public function dispose( )
     {
-        $this->classes = null;
-        $this->assets = null;
+        $this->_classes = null;
+        $this->_assets = null;
         $this->base = null;
         $this->base_url = null;
         return $this;
@@ -169,7 +171,7 @@ class Importer
                     $classname = $def[0]; $id = $def[1]; $path = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     if ( !empty( $classname ) && !empty( $id ) && !empty( $path ) ) 
                     {
-                        $this->classes[ $id ] = array(
+                        $this->_classes[ $id ] = array(
                             /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
                             $classname, 
                             $id, 
@@ -188,7 +190,7 @@ class Importer
                     $type = $def[0]; $id = $def[1]; $asset = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     if ( !empty( $type ) && !empty( $id ) && !empty( $asset ) ) 
                     {
-                        $this->assets[ $id ] = array(
+                        $this->_assets[ $id ] = array(
                             /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded */
                             strtolower($type), 
                             $id, 
@@ -220,7 +222,7 @@ class Importer
                                         Contemplate::add($dep, $this->path("$dep.tpl.html"));
                                 }
                             }*/
-                            if ( null !== $ctx )
+                            if ( !empty($ctx) )
                             {
                                 if ( !Contemplate::hasTpl( $id, $ctx ) )
                                 {
@@ -253,11 +255,11 @@ class Importer
         {
             $id = $queue[0];
             
-            if ( isset( $this->classes[$id] ) && !$this->classes[$id][4] )
+            if ( isset( $this->_classes[$id] ) && !$this->_classes[$id][4] )
             {
-                if ( !class_exists( $this->classes[$id][0] ) )
+                if ( !class_exists( $this->_classes[$id][0] ) )
                 {
-                    $deps = $this->classes[$id][3];
+                    $deps = $this->_classes[$id][3];
                     if ( !empty( $deps ) )
                     {
                         $needs_deps = false;
@@ -265,7 +267,7 @@ class Importer
                         for ($i=$numdeps-1; $i>=0; $i--)
                         {
                             $dep = $deps[$i];
-                            if ( isset( $this->classes[$dep] ) && !$this->classes[$dep][4] )
+                            if ( isset( $this->_classes[$dep] ) && !$this->_classes[$dep][4] )
                             {
                                 $needs_deps = true;
                                 array_unshift( $queue, $dep );
@@ -274,9 +276,9 @@ class Importer
                         if ( $needs_deps ) continue;
                         else array_shift( $queue );
                     }
-                    $this->classes[$id][4] = true;
-                    if ( false === $require ) @include( $this->classes[$id][2] );
-                    else require( $this->classes[$id][2] );
+                    $this->_classes[$id][4] = true;
+                    if ( false === $require ) @include( $this->_classes[$id][2] );
+                    else require( $this->_classes[$id][2] );
                 }
             }
             else
@@ -294,9 +296,9 @@ class Importer
         while ( !empty( $queue ) )
         {
             $id = $queue[0];
-            if ( isset( $this->assets[$id] ) && $this->assets[$id][4] && !$this->assets[$id][5] ) // enqueued but not loaded yet
+            if ( isset( $this->_assets[$id] ) && $this->_assets[$id][4] && !$this->_assets[$id][5] ) // enqueued but not loaded yet
             {
-                $asset_def =& $this->assets[$id];
+                $asset_def =& $this->_assets[$id];
                 $type = $asset_def[0]; 
                 $id = $asset_def[1];  
                 $asset = $asset_def[2]; 
@@ -308,9 +310,9 @@ class Importer
                     for ($i=$numdeps-1; $i>=0; $i--)
                     {
                         $dep = $deps[$i];
-                        if ( isset( $this->assets[$dep] ) && !$this->assets[$dep][5] )
+                        if ( isset( $this->_assets[$dep] ) && !$this->_assets[$dep][5] )
                         {
-                            $this->assets[$dep][4] = true; // enqueued
+                            $this->_assets[$dep][4] = true; // enqueued
                             $needs_deps = true;
                             array_unshift( $queue, $dep );
                         }
@@ -318,27 +320,32 @@ class Importer
                     if ( $needs_deps ) continue;
                     else array_shift( $queue );
                 }
-                $isStyle = (bool)('styles' === $type);
-                $isScript = (bool)('scripts' === $type);
-                $isLiteral = is_array($asset);
+                $is_style = (bool)('styles' === $type);
+                $is_script = (bool)('scripts' === $type);
+                $is_tpl = (bool)('templates' === $type);
+                $is_inlined = is_array($asset);
                 $asset_id = preg_replace( '/[\\-.\\/\\\\:]+/', '_', $id);
-                if ( $isStyle )
+                if ( $is_style )
                 {
-                    $out[] = $isLiteral 
+                    $out[] = $is_inlined
                             ? ("<style id=\"importer-inline-style-{$asset_id}\" type=\"text/css\" media=\"all\">{$asset[0]}</style>")
                             : ("<link id=\"importer-style-{$asset_id}\" type=\"text/css\" rel=\"stylesheet\" href=\"$asset\" media=\"all\" />");
                 }
-                elseif ( $isScript )
+                elseif ( $is_script )
                 {
-                    $out[] = $isLiteral 
+                    $out[] = $is_inlined
                             ? ("<script id=\"importer-inline-script-{$asset_id}\" type=\"text/javascript\">/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>")
                             : ("<script id=\"importer-script-{$asset_id}\" type=\"text/javascript\" src=\"$asset\"></script>");
                 }
+                elseif ( $is_tpl )
+                {
+                    $out[] = $is_inlined
+                            ? ("<script id=\"importer-inline-tpl-{$asset_id}\" type=\"text/x-tpl\">{$asset[0]}</script>")
+                            : ("<script id=\"importer-tpl-{$asset_id}\" type=\"text/x-tpl\">".file_get_contents($asset)."</script>");
+                }
                 else
                 {
-                    $out[] = $isLiteral 
-                            ? $asset[0]
-                            : $asset;
+                    $out[] = $is_inlined ? $asset[0] : $asset;
                 }
                 $asset_def[5] = true; // loaded
             }
@@ -354,14 +361,14 @@ class Importer
     {
         if ( !empty( $type ) && !empty( $id ) )
         {
-            if ( isset( $this->assets[$id] ) ) 
+            if ( isset( $this->_assets[$id] ) ) 
             {
-                $this->assets[$id][4] = true; // enqueued
+                $this->_assets[$id][4] = true; // enqueued
             }
             elseif ( !empty( $asset ) ) 
             {
                 $this->register("assets", array($type, $id, $asset, $deps));
-                $this->assets[$id][4] = true; // enqueued
+                $this->_assets[$id][4] = true; // enqueued
             }
         }
         return $this;
@@ -371,7 +378,7 @@ class Importer
     {
         $out = array( );
         $type = strtolower($type);
-        foreach ($this->assets as $asset_def)
+        foreach ($this->_assets as $asset_def)
         {
             if ( $type === $asset_def[0] && $asset_def[4] && !$asset_def[5] )
                 $out = array_merge($out, $this->import_asset($asset_def[1]));
@@ -385,16 +392,21 @@ class Importer
         if ( class_exists('Contemplate') )
         {
             if ( !empty( $path ) ) $this->register( "templates", array($tpl, $path, $deps), $ctx );
-            return null !== $ctx ? Contemplate::tpl( $tpl, null, $ctx ) : Contemplate::tpl( $tpl );
+            return !empty($ctx) ? Contemplate::tpl( $tpl, null, $ctx ) : Contemplate::tpl( $tpl );
         }
         return null;
     }
     
-    public function import( $classname, $path=null, $deps=array() )
+    public function getFile( $path, $opts=array() )
     {
-        if ( !isset( $this->classes[$classname] ) && !empty($path) )
+        return @file_get_contents( $this->path( $path ) );
+    }
+    
+    public function importClass( $classname, $path=null, $deps=array() )
+    {
+        if ( !isset( $this->_classes[$classname] ) && !empty($path) )
             $this->register("classes", array($classname, $classname, $this->path("{$path}.php"), $deps));
-        if ( isset( $this->classes[$classname] ) && !$this->classes[$classname][4] && file_exists( $this->classes[$classname][2] ) )
+        if ( isset( $this->_classes[$classname] ) && !$this->_classes[$classname][4] && file_exists( $this->_classes[$classname][2] ) )
             $this->import_class($classname);
         return $this;
     }
@@ -406,4 +418,5 @@ class Importer
         return $this;
     }
 }
+Importer::$BASE = dirname(__FILE__);
 }
