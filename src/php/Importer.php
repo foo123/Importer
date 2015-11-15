@@ -3,14 +3,14 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/JS
 *
-*  @version 0.2.0
+*  @version 0.3.0
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer') )
 { 
 class Importer
 {
-    const VERSION = '0.2.0';
+    const VERSION = '0.3.0';
     
     const DS = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -92,6 +92,7 @@ class Importer
     private $base_url = null;
     private $_classes = null;
     private $_assets = null;
+    private $_hooks = null;
     
     public static function _( $base='', $base_url='' )
     {
@@ -102,6 +103,7 @@ class Importer
     {
         $this->_classes = array( );
         $this->_assets = array( );
+        $this->_hooks = array( );
         $this->base = '';
         $this->base_url = '';
         $this->base_path( $base, $base_url );
@@ -116,8 +118,68 @@ class Importer
     {
         $this->_classes = null;
         $this->_assets = null;
+        $this->_hooks = null;
         $this->base = null;
         $this->base_url = null;
+        return $this;
+    }
+    
+    public function on( $hook, $handler, $once=false )
+    {
+        if ( !empty($hook) && is_callable($handler) )
+        {
+            if ( !isset($this->_hooks[$hook]) ) $this->_hooks[$hook] = array();
+            $this->_hooks[$hook][] = array($handler, true === $once, 0);
+        }
+        return $this;
+    }
+    
+    public function one( $hook, $handler )
+    {
+        return $this->on( $hook, $handler, true );
+    }
+    
+    public function off( $hook, $handler )
+    {
+        if ( !empty($hook) && !empty($this->_hooks[$hook]) )
+        {
+            if ( true === $handler )
+            {
+                unset($this->_hooks[$hook]);
+            }
+            elseif ( $handler )
+            {
+                $hooks =& $this->_hooks[$hook];
+                for($i=count($hooks)-1; $i>=0; $i--)
+                {
+                    if ( $handler === $hooks[$i][0] )
+                        array_splice( $hooks, $i, 1 );
+                }
+            }
+        }
+        return $this;
+    }
+    
+    public function trigger( $hook, $args=array() )
+    {
+        if ( !empty($hook) && !empty($this->_hooks[$hook]) )
+        {
+            $hooks =& $this->_hooks[$hook];
+            $args = (array)$args;
+            foreach($hooks as $i=>&$h)
+            {
+                if ( $h[1] && $h[2] ) continue;
+                $h[2] = 1; // called;
+                $ret = call_user_func_array( $h[0], $args );
+                if ( false === $ret ) break;
+            }
+            // remove called oneoffs
+            for($i=count($hooks)-1; $i>=0; $i--)
+            {
+                if ( $hooks[$i][1] && $hooks[$i][2] )
+                    array_splice( $hooks, $i, 1 );
+            }
+        }
         return $this;
     }
     
@@ -157,7 +219,7 @@ class Importer
         return $this->get_path( $asset, $this->base_url );
     }
     
-    public function register( $what, $defs, $ctx=null )
+    public function register( $what, $defs )
     {
         if ( is_array( $defs ) && !empty( $defs ) )
         {
@@ -167,18 +229,17 @@ class Importer
             {
                 foreach ($defs as $def)
                 {
-                    /* 0:class, 1:id, 2:path, 3:deps, 4:cb */
+                    /* 0:class, 1:id, 2:path, 3:deps */
                     $classname = $def[0]; $id = $def[1]; $path = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     if ( !empty( $classname ) && !empty( $id ) && !empty( $path ) ) 
                     {
                         $this->_classes[ $id ] = array(
-                            /* 0:class, 1:id, 2:path, 3:deps, 4:loaded, 5:callback */
+                            /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
                             $classname, 
                             $id, 
                             $this->path( $path ), 
                             (array)$deps, 
-                            false,
-                            !empty($def[4])&&is_callable($def[4]) ? $def[4] : null
+                            false
                         );
                     }
                 }
@@ -187,62 +248,20 @@ class Importer
             {
                 foreach ($defs as $def)
                 {
-                    /* 0:type, 1:id, 2:asset, 3:deps, 4:cb */
+                    /* 0:type, 1:id, 2:asset, 3:deps */
                     $type = $def[0]; $id = $def[1]; $asset = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     if ( !empty( $type ) && !empty( $id ) && !empty( $asset ) ) 
                     {
                         $this->_assets[ $id ] = array(
-                            /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded, 6:callback */
+                            /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded */
                             strtolower($type), 
                             $id, 
                             // maybe literal asset
                             is_string( $asset ) ? $this->path_url( $asset ) : $asset,
                             (array)$deps, 
                             false, 
-                            false,
-                            !empty($def[4])&&is_callable($def[4]) ? $def[4] : null
+                            false
                         );
-                    }
-                }
-            }
-            elseif ( 'templates' === $what )
-            {
-                // support Contemplate templates functionality
-                if ( class_exists('Contemplate') )
-                {
-                    foreach ($defs as $def)
-                    {
-                        /* 0:id, 1:path, 2:deps, 3:cb */
-                        $id = $def[0]; $path = $def[1]; $deps = isset($def[2]) ? $def[2] : array();
-                        if ( !empty( $id ) && !empty( $path ) ) 
-                        {
-                            /*if ( !empty( $deps ) )
-                            {
-                                foreach((array)$deps as $dep)
-                                {
-                                    if ( !Contemplate::hasTpl($dep) ) 
-                                        Contemplate::add($dep, $this->path("$dep.tpl.html"));
-                                }
-                            }*/
-                            if ( !empty($ctx) )
-                            {
-                                if ( !Contemplate::hasTpl( $id, $ctx ) )
-                                {
-                                    $args = array();
-                                    $args[$id] = $this->path( $path );
-                                    Contemplate::add( $args, $ctx );
-                                }
-                            }
-                            else
-                            {
-                                if ( !Contemplate::hasTpl( $id ) )
-                                {
-                                    $args = array();
-                                    $args[$id] = $this->path( $path );
-                                    Contemplate::add( $args );
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -278,16 +297,19 @@ class Importer
                         if ( $needs_deps ) continue;
                         else array_shift( $queue );
                     }
-                    $this->_classes[$id][4] = true;
+                    $this->_classes[$id][4] = true; // loaded
+                    
                     if ( false === $require ) @include( $this->_classes[$id][2] );
                     else require( $this->_classes[$id][2] );
-                    // callback
-                    if ( !empty($this->_classes[$id][5]) )
-                        call_user_func( 
-                            $this->_classes[$id][5],
-                            // $importer, $id,      $classname,   $path
-                            $this, $id, $this->_classes[$id][0], $this->_classes[$id][2]
-                        );
+                    
+                    // hook here
+                    $this->trigger("import-class", array(
+                        // $importer, $id,      $classname,   $path
+                        $this, $id, $this->_classes[$id][0], $this->_classes[$id][2]
+                    ))->trigger("import-class-{$id}", array(
+                        // $importer, $id,      $classname,   $path
+                        $this, $id, $this->_classes[$id][0], $this->_classes[$id][2]
+                    ));
                 }
             }
             else
@@ -329,45 +351,52 @@ class Importer
                     if ( $needs_deps ) continue;
                     else array_shift( $queue );
                 }
-                $is_style = (bool)('styles' === $type);
-                $is_script = (bool)('scripts' === $type);
-                $is_tpl = (bool)('templates' === $type);
-                $is_inlined = is_array($asset);
-                $asset_id = preg_replace( '/[\\-.\\/\\\\:]+/', '_', $id);
-                if ( $is_style )
+                $asset_def[5] = true; // loaded
+                
+                // hook here
+                $ret = array();
+                $this->trigger("import-asset", array(
+                    // $importer, $id,      $type,   $asset
+                    $this, $id, $type, $asset, &$ret
+                ))->trigger("import-asset-{$id}", array(
+                    // $importer, $id,      $type,   $asset
+                    $this, $id, $type, $asset, &$ret
+                ));
+                
+                if ( isset($ret['return']) )
                 {
-                    $out[] = $is_inlined
-                            ? ("<style id=\"importer-inline-style-{$asset_id}\" type=\"text/css\" media=\"all\">{$asset[0]}</style>")
-                            : ("<link id=\"importer-style-{$asset_id}\" type=\"text/css\" rel=\"stylesheet\" href=\"".$this->path_url($asset)."\" media=\"all\" />");
-                }
-                elseif ( $is_script )
-                {
-                    $out[] = $is_inlined
-                            ? ("<script id=\"importer-inline-script-{$asset_id}\" type=\"text/javascript\">/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>")
-                            : ("<script id=\"importer-script-{$asset_id}\" type=\"text/javascript\" src=\"".$this->path_url($asset)."\"></script>");
-                }
-                elseif ( $is_tpl )
-                {
-                    $out[] = $is_inlined
-                            ? ("<script id=\"importer-inline-tpl-{$asset_id}\" type=\"text/x-tpl\">{$asset[0]}</script>")
-                            : ("<script id=\"importer-inline-tpl-{$asset_id}\" type=\"text/x-tpl\">".$this->getFile($asset)."</script>");
+                    $out[] = $ret['return'];
                 }
                 else
                 {
-                    if ( $asset_def[6] ) // callback
+                    $is_style = (bool)('styles' === $type);
+                    $is_script = (bool)('scripts' === $type);
+                    $is_tpl = (bool)('templates' === $type);
+                    $is_inlined = is_array($asset);
+                    $asset_id = preg_replace( '/[\\-.\\/\\\\:]+/', '_', $id);
+                    if ( $is_style )
                     {
-                        $ret = call_user_func(
-                            $asset_def[6],
-                            $this, 'output', $type, $id, $asset
-                        );
-                        $out[] = !empty($ret) ? $ret : '';
+                        $out[] = $is_inlined
+                                ? ("<style id=\"importer-inline-style-{$asset_id}\" type=\"text/css\" media=\"all\">{$asset[0]}</style>")
+                                : ("<link id=\"importer-style-{$asset_id}\" type=\"text/css\" rel=\"stylesheet\" href=\"".$this->path_url($asset)."\" media=\"all\" />");
+                    }
+                    elseif ( $is_script )
+                    {
+                        $out[] = $is_inlined
+                                ? ("<script id=\"importer-inline-script-{$asset_id}\" type=\"text/javascript\">/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>")
+                                : ("<script id=\"importer-script-{$asset_id}\" type=\"text/javascript\" src=\"".$this->path_url($asset)."\"></script>");
+                    }
+                    elseif ( $is_tpl )
+                    {
+                        $out[] = $is_inlined
+                                ? ("<script id=\"importer-inline-tpl-{$asset_id}\" type=\"text/x-tpl\">{$asset[0]}</script>")
+                                : ("<script id=\"importer-inline-tpl-{$asset_id}\" type=\"text/x-tpl\">".$this->get($asset)."</script>");
                     }
                     else
                     {
-                        $out[] = $is_inlined ? $asset[0] : $this->getFile($asset);
+                        $out[] = $is_inlined ? $asset[0] : $this->get($asset);
                     }
                 }
-                $asset_def[5] = true; // loaded
             }
             else
             {
@@ -375,33 +404,6 @@ class Importer
             }
         }
         return $out;
-    }
-    
-    public function enqueue( $type, $id, $asset=null, $deps=array(), $cb=null )
-    {
-        if ( !empty( $type ) && !empty( $id ) )
-        {
-            if ( isset( $this->_assets[$id] ) ) 
-            {
-                $this->_assets[$id][4] = true; // enqueued
-                if ( $this->_assets[$id][6] ) // callback
-                    call_user_func(
-                        $this->_assets[$id][6],
-                        $this, 'enqueue', $type, $id, $this->_assets[$id][2]
-                    );
-            }
-            elseif ( !empty( $asset ) ) 
-            {
-                $this->register("assets", array($type, $id, $asset, $deps, $cb));
-                $this->_assets[$id][4] = true; // enqueued
-                if ( $this->_assets[$id][6] ) // callback
-                    call_user_func(
-                        $this->_assets[$id][6],
-                        $this, 'enqueue', $type, $id, $this->_assets[$id][2]
-                    );
-            }
-        }
-        return $this;
     }
     
     public function assets( $type="scripts" )
@@ -416,35 +418,72 @@ class Importer
         return implode("\n", $out);
     }
     
-    public function tpl( $tpl, $path=null, $deps=array(), $ctx=null )
+    public function enqueue( $type, $id, $asset=null, $deps=array() )
     {
-        // support Contemplate templates functionality
-        if ( class_exists('Contemplate') )
+        if ( !empty( $type ) && !empty( $id ) )
         {
-            if ( !empty( $path ) ) $this->register( "templates", array($tpl, $path, $deps), $ctx );
-            return !empty($ctx) ? Contemplate::tpl( $tpl, null, $ctx ) : Contemplate::tpl( $tpl );
+            if ( isset( $this->_assets[$id] ) ) 
+            {
+                $this->_assets[$id][4] = true; // enqueued
+                // hook here
+                $this->trigger("enqueue-asset", array(
+                    // $importer, $id,      $type,   $asset
+                    $this, $id, $type, $this->_assets[$id][2]
+                ))->trigger("enqueue-asset-{$id}", array(
+                    // $importer, $id,      $type,   $asset
+                    $this, $id, $type, $this->_assets[$id][2]
+                ));
+            }
+            elseif ( !empty( $asset ) ) 
+            {
+                $this->register("assets", array($type, $id, $asset, $deps));
+                $this->_assets[$id][4] = true; // enqueued
+                // hook here
+                $this->trigger("enqueue-asset", array(
+                    // $importer, $id,      $type,   $asset
+                    $this, $id, $type, $this->_assets[$id][2]
+                ))->trigger("enqueue-asset-{$id}", array(
+                    // $importer, $id,      $type,   $asset
+                    $this, $id, $type, $this->_assets[$id][2]
+                ));
+            }
         }
-        return null;
-    }
-    
-    public function getFile( $path, $opts=array() )
-    {
-        return @file_get_contents( $this->path( $path ) );
-    }
-    
-    public function importClass( $classname, $path=null, $deps=array() )
-    {
-        if ( !isset( $this->_classes[$classname] ) && !empty($path) )
-            $this->register("classes", array($classname, $classname, $this->path("{$path}.php"), $deps));
-        if ( isset( $this->_classes[$classname] ) && !$this->_classes[$classname][4] && file_exists( $this->_classes[$classname][2] ) )
-            $this->import_class($classname);
         return $this;
     }
     
-    public function importAll( $classnames )
+    public function get( $path, $opts=array() )
     {
-        if ( empty($classnames) ) return $this;
-        foreach((array)$classnames as $classname) $this->import( $classname );
+        if ( !empty($opts['binary']) )
+        {
+            $fp = fopen( $this->path( $path ), "rb" );
+            if ( $fp )
+            {
+                $data = @fread( $fp );
+                fclose( $fp );
+            }
+            else $data = '';
+        }
+        else
+        {
+            $data = @file_get_contents( $this->path( $path ) );
+        }
+        return $data;
+    }
+    
+    public function load( $classname, $path=null, $deps=array() )
+    {
+        if ( is_array($classname) )
+        {
+            foreach($classname as $class)
+                $this->load( $class );
+        }
+        else
+        {
+            if ( !isset( $this->_classes[$classname] ) && !empty($path) )
+                $this->register("classes", array($classname, $classname, $this->path($path), $deps));
+            if ( isset( $this->_classes[$classname] ) && !$this->_classes[$classname][4] && file_exists( $this->_classes[$classname][2] ) )
+                $this->import_class($classname);
+        }
         return $this;
     }
 }

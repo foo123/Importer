@@ -1,4 +1,5 @@
-C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\js
+Importer.VERSION = 0.3.0
+Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\js
 Test1.js
 Test2.js
 Callback
@@ -6,7 +7,8 @@ Callback
    { base: 'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test',
      base_url: 'http://_mygit/Importer/test/',
      _classes: { Test1: [Object], Test2: [Object] },
-     _assets: {},
+     _assets: { asset1: [Object], asset2: [Object], asset3: [Object] },
+     _hooks: { 'import-class-Test2': [Object] },
      _cache: {} },
   '1': 'Test2',
   '2': 'Test2',

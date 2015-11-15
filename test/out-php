@@ -1,4 +1,5 @@
-C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
+Importer.VERSION = 0.3.0
+Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
 Test1.php
 Test2.php
 Callback
@@ -20,7 +21,6 @@ Array
                                 )
 
                             [4] => 1
-                            [5] => 
                         )
 
                     [Test2] => Array
@@ -34,13 +34,73 @@ Array
                                 )
 
                             [4] => 1
-                            [5] => console_log
                         )
 
                 )
 
             [_assets:Importer:private] => Array
                 (
+                    [asset1] => Array
+                        (
+                            [0] => styles
+                            [1] => asset1
+                            [2] => http://_mygit/Importer/test/assets/asset1.css
+                            [3] => Array
+                                (
+                                )
+
+                            [4] => 
+                            [5] => 
+                        )
+
+                    [asset2] => Array
+                        (
+                            [0] => styles
+                            [1] => asset2
+                            [2] => http://_mygit/Importer/test/assets/asset2.css
+                            [3] => Array
+                                (
+                                    [0] => asset1
+                                )
+
+                            [4] => 
+                            [5] => 
+                        )
+
+                    [asset3] => Array
+                        (
+                            [0] => styles
+                            [1] => asset3
+                            [2] => Array
+                                (
+                                    [0] => /* asset 3 */
+                                )
+
+                            [3] => Array
+                                (
+                                    [0] => asset1
+                                    [1] => asset2
+                                )
+
+                            [4] => 
+                            [5] => 
+                        )
+
+                )
+
+            [_hooks:Importer:private] => Array
+                (
+                    [import-class-Test2] => Array
+                        (
+                            [0] => Array
+                                (
+                                    [0] => console_log
+                                    [1] => 
+                                    [2] => 1
+                                )
+
+                        )
+
                 )
 
         )
