@@ -23,6 +23,11 @@ else if ( !(name in root) ) /* Browser/WebWorker/.. */
 
 var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 'toLowerCase',
     toString = Object[PROTO].toString, map = Array[PROTO].map,
+    NOP = function( ){ },
+    
+    startsWith = String[PROTO].startsWith 
+            ? function( s, pre, pos ){return s.startsWith(pre, pos||0);} 
+            : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
     
     isXPCOM = ("undefined" !== typeof Components) && ("object" === typeof Components.classes) && ("object" === typeof Components.classesByID) && Components.utils && ("function" === typeof Components.utils['import']),
     isNode = !isXPCOM && ("undefined" !== typeof global) && ("[object global]" === toString.call(global)),
@@ -31,23 +36,57 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     
     Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
     
-    DS = '/', DS_RE = /\/|\\/g, PROTOCOL = '://', PROTOCOL_RE = '#PROTOCOL#',
-    ID_RE = /[\-.\/\\:]+/g,
-    startsWith = String[PROTO].startsWith 
-            ? function( s, pre, pos ){return s.startsWith(pre, pos||0);} 
-            : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
+    Cu = isXPCOM ? Components.utils : {},
+    Cc = isXPCOM ? Components.classes : {},
+    Ci = isXPCOM ? Components.interfaces : {},
+    import_ = isXPCOM ? Cu['import'] : (isNode ? require : NOP),
+    fs = isNode ? import_('fs') : {},
+    import_module = isXPCOM
+    ? function import_module( name, path, scope ) {
+        import_( path, scope );
+        return scope[ name ];
+    }
+    : (isNode
+    ? function import_module( name, path, scope ) {
+        return import_( path );
+    }
+    : (isWebWorker
+    ? function import_module( name, path, scope ) {
+        import_( path );
+        return scope[ name ];
+    }
+    : NOP)),
+    XHR = function( ) {
+    return window.XMLHttpRequest
+        // code for IE7+, Firefox, Chrome, Opera, Safari
+        ? new XMLHttpRequest( )
+        // code for IE6, IE5
+        : new ActiveXObject("Microsoft.XMLHTTP") // or ActiveXObject("Msxml2.XMLHTTP"); ??
+    ;
+    },
     
+    DS_RE = /\/|\\/g, PROTOCOL = '://', PROTOCOL_RE = '#PROTOCOL#', ID_RE = /[\-.\/\\:]+/g,
+    DS = isXPCOM
+    ? (function path_separator( ){
+        // http://stackoverflow.com/a/7092596/3591273
+        var profil_dir = Cc["@mozilla.org/file/directory_service;1"].getService(Ci.nsIProperties).get("ProfD",Ci.nsIFile);
+        profil_dir.append("abc"); profil_dir.append("abc");
+        return profil_dir.path.substr(profil_dir.path.length-("abc".length)-1,1);
+    })( )
+    : (isNode
+    ? import_('path').sep /* https://nodejs.org/api/path.html#path_path_sep */
+    : '/'),
     
     read_file = isXPCOM
     ? function read_file( path, enc ) {
         var data, file, stream, len;
         // https://developer.mozilla.org/en-US/Add-ons/Code_snippets/File_I_O
-        Components.utils.import("resource://gre/modules/FileUtils.jsm");
+        import_("resource://gre/modules/FileUtils.jsm");
         file = new FileUtils.File( path );
-        stream = Components.classes["@mozilla.org/network/file-input-stream;1"].createInstance(Components.interfaces.nsIFileInputStream);
+        stream = Cc["@mozilla.org/network/file-input-stream;1"].createInstance(Ci.nsIFileInputStream);
         if ( 'binary' === enc )
         {
-            var bstream = Components.classes["@mozilla.org/binaryinputstream;1"].createInstance(Components.interfaces.nsIBinaryInputStream);
+            var bstream = Cc["@mozilla.org/binaryinputstream;1"].createInstance(Ci.nsIBinaryInputStream);
             stream.init(file, -1, -1, false);
             len = stream.available( );
             bstream.setInputStream( stream );
@@ -56,8 +95,8 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
         }
         else
         {
-            var cstream = Components.classes["@mozilla.org/intl/converter-input-stream;1"].createInstance(Components.interfaces.nsIConverterInputStream), str = {}, read = 0
-            ;
+            var cstream = Cc["@mozilla.org/intl/converter-input-stream;1"].createInstance(Ci.nsIConverterInputStream),
+                str = {}, read = 0;
             stream.init(file, -1, 0, 0); cstream.init(stream, enc, 0, 0);
             do { 
                 // read as much as we can and put it in str.value
@@ -70,15 +109,10 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     }
     : (isNode
     ? function read_file( path, enc ) {
-        return require('fs').readFileSync( path, 'binary' === enc ? {} : {encoding:enc} );
+        return fs.readFileSync( path, 'binary' === enc ? {} : {encoding:enc} );
     }
     : function read_file( path, enc ) {
-        var xhr = window.XMLHttpRequest
-            // code for IE7+, Firefox, Chrome, Opera, Safari
-            ? new XMLHttpRequest( )
-            // code for IE6, IE5
-            : new ActiveXObject("Microsoft.XMLHTTP") // or ActiveXObject("Msxml2.XMLHTTP"); ??
-        ;
+        var xhr = XHR( );
         
         // plain text with enc encoding format
         xhr.open('GET', path, false);  // 'false' makes the request synchronous
@@ -103,14 +137,15 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     read_file_async = isXPCOM
     ? function read_file_async( path, enc, cb ) {
         // https://developer.mozilla.org/en-US/Add-ons/Code_snippets/File_I_O
-        Components.utils.import("resource://gre/modules/NetUtil.jsm");
+        import_("resource://gre/modules/NetUtil.jsm");
         NetUtil.asyncFetch(path, function( stream, status ) {
             var data;
             if ( Components.isSuccessCode( status ) )
             {
                 if ( 'binary' === enc )
                 {
-                    var bstream = Components.classes["@mozilla.org/binaryinputstream;1"].createInstance(Components.interfaces.nsIBinaryInputStream), len = stream.available( );
+                    var bstream = Cc["@mozilla.org/binaryinputstream;1"].createInstance(Ci.nsIBinaryInputStream),
+                        len = stream.available( );
                     bstream.setInputStream( stream );
                     bstream.readByteArray( len, data = new Uint8Array( len ) );
                     bstream.close( );
@@ -129,7 +164,6 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     }
     : (isNode
     ? function read_file_async( path, enc, cb ) {
-        var fs = require('fs');
         if ( 'binary' === enc )
         {
             fs.readFile(path, function( err, data ){
@@ -145,12 +179,7 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
         return '';
     }
     : function read_file_async( path, enc, cb ) {
-        var xhr = window.XMLHttpRequest
-            // code for IE7+, Firefox, Chrome, Opera, Safari
-            ? new XMLHttpRequest( )
-            // code for IE6, IE5
-            : new ActiveXObject("Microsoft.XMLHTTP") // or ActiveXObject("Msxml2.XMLHTTP"); ??
-        ;
+        var xhr = XHR( );
         
         // plain text with enc encoding format
         xhr.open('GET', path, true);  // 'true' makes the request asynchronous
@@ -178,6 +207,159 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     
     Importer
 ;
+
+// load javascript(s)/text(s) (a)sync in node, browser, webworker, xpcom module
+function load_deps( importer, scope, cache, ref, complete )
+{
+    var dl = ref.length, i, t, cached,
+        head, load, next, loaded = new Array( dl );
+    // xpcom module / nodejs, require / webworker, importScripts
+    if ( isXPCOM || isNode || isWebWorker )
+    {
+        for (i=0; i<dl; i++)
+        {
+            if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
+            else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[ i ].cache_id ] = read_file( ref[ i ].path, isXPCOM ? 'UTF-8' : 'utf8' );
+            else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
+            else
+            {                
+                loaded[ i ] = import_module( scope[ ref[ i ].name, ref[ i ].path, scope ] ) || null;
+                // hook here
+                importer.trigger("import-class", [
+                    //          this,     id,        classname,   path,        reference
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                ]).trigger("import-class-"+ref[i].id, [
+                    //          this,     id,        classname,   path,        reference
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                ]);
+            }
+        }
+        return complete.apply( scope, loaded );
+    }
+    // browser, <script> tags
+    else
+    {
+        head = $$tag("head", 0); 
+        t = 0; i = 0;
+        load = function load( id, type, path, next ) {
+            var done, script;
+            if ( 'style' === type || 'script' === type )
+            {
+                if ( (script = $$(id)) && type === script.tagName[LOWER]( ) ) 
+                {
+                    next( );
+                }
+                else
+                {
+                    read_file_async( path, 'utf8', function(data){
+                        cache[ id ]  = data;
+                        $$asset(type, data)[ATTR]("id", id);
+                        next( );
+                    });
+                }
+            }
+            else if ( 'class' !== type )
+            {
+                if ( 'template' === type && (script = $$(id)) && 'script' === script.tagName[LOWER]( ) ) 
+                {
+                    next( );
+                }
+                else
+                {
+                    read_file_async( path, 'utf8', function(data){
+                        cache[ id ]  = data;
+                        if ( 'template' === type && !$$(id) )
+                            $$asset('tpl', data)[ATTR]("id", id);
+                        next( );
+                    });
+                }
+            }
+            else
+            {
+                if ( (script = $$(id)) && 'script' === script.tagName[LOWER]( ) ) 
+                {
+                    next( );
+                }
+                else
+                {
+                    done = 0;
+                    script = $$el('script');
+                    script[ATTR]('id', id); 
+                    script[ATTR]('type', 'text/javascript'); 
+                    script[ATTR]('language', 'javascript');
+                    script.onload = script.onreadystatechange = function( ) {
+                        if (!done && (!script.readyState || script.readyState == 'loaded' || script.readyState == 'complete'))
+                        {
+                            done = 1; 
+                            script.onload = script.onreadystatechange = null;
+                        }
+                        next( );
+                    }
+                    // load it
+                    //script.src = path;
+                    script[ATTR]('src', path);
+                    head.appendChild( script ); 
+                }
+            }
+        };
+        next = function next( ) {
+            var cached;
+            if ( (cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope) )
+            {
+                loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
+                
+                // hook here
+                importer.trigger("import-class", [
+                    //          this,     id,        classname,   path,        reference
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                ]).trigger("import-class-"+ref[i].id, [
+                    //          this,     id,        classname,   path,        reference
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                ]);
+                
+                if ( ++i >= dl ) 
+                {
+                    complete.apply( scope, loaded );
+                }
+                else if ( (cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope) ) 
+                {
+                    loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
+                    next( ); 
+                }
+                else
+                {                    
+                    scope[ ref[ i ].name ] = null;
+                    load( ref[ i ].cache_id, ref[ i ].type, ref[ i ].path, next );
+                }
+            }
+            else if ( ++t < 4 ) 
+            { 
+                setTimeout( next, 20 ); 
+            }
+            else 
+            { 
+                t = 0; 
+                scope[ ref[ i ].name ] = null;
+                // hook here
+                importer.trigger("import-class", [
+                    //          this,     id,        classname,   path,        reference
+                    importer, ref[i].id, ref[i].name, ref[i].path, null
+                ]).trigger("import-class-"+ref[i].id, [
+                    //          this,     id,        classname,   path,        reference
+                    importer, ref[i].id, ref[i].name, ref[i].path, null
+                ]);
+                i++; next( ); 
+            }
+        };
+        while ( i < dl && ((cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope)) ) 
+        {
+            loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
+            i++;
+        }
+        if ( i < dl ) load( ref[ i ].cache_id, ref[ i ].type, ref[ i ].path, next );
+        else complete.apply( scope, loaded );
+    }
+}
 
 function is_callable( o )
 {
@@ -378,205 +560,6 @@ function dispose_asset( asset )
         document.head.removeChild( asset );
 }
 
-// load javascript(s)/text(s) (a)sync in node, browser, webworker
-function load_deps( importer, scope, cache, ref, complete )
-{
-    var dl = ref.length, i, t, cached,
-        head, load, next, loaded = new Array( dl );
-    // xpcom module
-    if ( isXPCOM )
-    {
-            if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
-            else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[ i ].cache_id ] = read_file( ref[ i ].path, 'UTF-8' );
-            else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
-            else
-            {                
-                Components.utils['import']( ref[ i ].path, scope );
-                loaded[ i ] = scope[ ref[ i ].name ] || null;
-                // hook here
-                importer.trigger("import-class", [
-                    //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]).trigger("import-class-"+ref[i].id, [
-                    //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]);
-            }
-        }
-        return complete.apply( scope, loaded );
-    }
-    // nodejs, require
-    else if ( isNode )
-    {
-        for (i=0; i<dl; i++) 
-        {
-            if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
-            else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[ i ].cache_id ] = read_file( ref[ i ].path, 'utf8' );
-            else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
-            else
-            {                
-                loaded[ i ] = require( ref[ i ].path ) || null;
-                // hook here
-                importer.trigger("import-class", [
-                    //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]).trigger("import-class-"+ref[i].id, [
-                    //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]);
-            }
-        }
-        return complete.apply( scope, loaded );
-    }
-    // webworker, importScripts
-    else if ( isWebWorker )
-    {
-        for (i=0; i<dl; i++) 
-        {
-            if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
-            else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[ i ].cache_id ] = read_file( ref[ i ].path, 'utf8' );
-            else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
-            else
-            {
-                importScripts( ref[ i ].path );
-                loaded[ i ] = scope[ ref[ i ].name ] || null;
-                // hook here
-                importer.trigger("import-class", [
-                    //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]).trigger("import-class-"+ref[i].id, [
-                    //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]);
-            }
-        }
-        return complete.apply( scope, loaded );
-    }
-    // browser, <script> tags
-    else
-    {
-        head = $$tag("head", 0); 
-        t = 0; i = 0;
-        load = function load( id, type, path, next ) {
-            var done, script;
-            if ( 'style' === type || 'script' === type )
-            {
-                if ( (script = $$(id)) && type === script.tagName[LOWER]( ) ) 
-                {
-                    next( );
-                }
-                else
-                {
-                    read_file_async( path, 'utf8', function(data){
-                        cache[ id ]  = data;
-                        $$asset(type, data)[ATTR]("id", id);
-                        next( );
-                    });
-                }
-            }
-            else if ( 'class' !== type )
-            {
-                if ( 'template' === type && (script = $$(id)) && 'script' === script.tagName[LOWER]( ) ) 
-                {
-                    next( );
-                }
-                else
-                {
-                    read_file_async( path, 'utf8', function(data){
-                        cache[ id ]  = data;
-                        if ( 'template' === type && !$$(id) )
-                            $$asset('tpl', data)[ATTR]("id", id);
-                        next( );
-                    });
-                }
-            }
-            else
-            {
-                if ( (script = $$(id)) && 'script' === script.tagName[LOWER]( ) ) 
-                {
-                    next( );
-                }
-                else
-                {
-                    done = 0;
-                    script = $$el('script');
-                    script[ATTR]('id', id); 
-                    script[ATTR]('type', 'text/javascript'); 
-                    script[ATTR]('language', 'javascript');
-                    script.onload = script.onreadystatechange = function( ) {
-                        if (!done && (!script.readyState || script.readyState == 'loaded' || script.readyState == 'complete'))
-                        {
-                            done = 1; 
-                            script.onload = script.onreadystatechange = null;
-                        }
-                        next( );
-                    }
-                    // load it
-                    //script.src = path;
-                    script[ATTR]('src', path);
-                    head.appendChild( script ); 
-                }
-            }
-        };
-        next = function next( ) {
-            var cached;
-            if ( (cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope) )
-            {
-                loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
-                
-                // hook here
-                importer.trigger("import-class", [
-                    //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]).trigger("import-class-"+ref[i].id, [
-                    //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]);
-                
-                if ( ++i >= dl ) 
-                {
-                    complete.apply( scope, loaded );
-                }
-                else if ( (cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope) ) 
-                {
-                    loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
-                    next( ); 
-                }
-                else
-                {                    
-                    scope[ ref[ i ].name ] = null;
-                    load( ref[ i ].cache_id, ref[ i ].type, ref[ i ].path, next );
-                }
-            }
-            else if ( ++t < 4 ) 
-            { 
-                setTimeout( next, 20 ); 
-            }
-            else 
-            { 
-                t = 0; 
-                scope[ ref[ i ].name ] = null;
-                // hook here
-                importer.trigger("import-class", [
-                    //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, null
-                ]).trigger("import-class-"+ref[i].id, [
-                    //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, null
-                ]);
-                i++; next( ); 
-            }
-        };
-        while ( i < dl && ((cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope)) ) 
-        {
-            loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
-            i++;
-        }
-        if ( i < dl ) load( ref[ i ].cache_id, ref[ i ].type, ref[ i ].path, next );
-        else complete.apply( scope, loaded );
-    }
-}
-
 function remove_protocol( p )
 {
     return p.split( PROTOCOL ).join( PROTOCOL_RE );
@@ -589,16 +572,16 @@ function add_protocol( p )
 
 function path_join( )
 {
-    if ( !arguments.length ) return '.';
     var p, args = arguments, full = '.';
+    !args.length && (return full);
     if ( isXPCOM )
     {
-        Components.utils.import("resource://gre/modules/osfile.jsm");
+        import_("resource://gre/modules/osfile.jsm");
         full = OS.Path.join.apply( OS.Path, args );
     }
     else if ( isNode )
     {
-        p = require('path');
+        p = import_('path');
         full = p.join.apply( p, args );
     }
     /*else if ( isBrowser && !isWebWorker )
