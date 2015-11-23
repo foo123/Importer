@@ -2,41 +2,34 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/JS
 *
-*  @version 0.3.0
+*  @version 0.3.1
 *  https://github.com/foo123/Importer
 **/
 !function( root, name, factory ) {
 "use strict";
-
-// export the module, umd-style (no other dependencies)
-var isCommonJS = ("object" === typeof(module)) && module.exports, 
-    isAMD = ("function" === typeof(define)) && define.amd, m;
-
-// CommonJS, node, etc..
-if ( isCommonJS ) 
-    module.exports = (module.$deps = module.$deps || {})[ name ] = module.$deps[ name ] || (factory.call( root, {NODE:module} ) || 1);
-
-// AMD, requireJS, etc..
-else if ( isAMD && ("function" === typeof(require)) && ("function" === typeof(require.specified)) && require.specified(name) ) 
-    define( name, ['require', 'exports', 'module'], function( require, exports, module ){ return factory.call( root, {AMD:module} ); } );
-
-// browser, web worker, etc.. + AMD, other loaders
-else if ( !(name in root) ) 
-    (root[ name ] = (m=factory.call( root, {} ) || 1)) && isAMD && define( name, [], function( ){ return m; } );
-
+var m;
+if ( ('undefined'!==typeof Components)&&('object'===typeof Components.classes)&&('object'===typeof Components.classesByID)&&Components.utils&&('function'===typeof Components.utils['import']) ) /* XPCOM */
+    (root.EXPORTED_SYMBOLS = [ name ]) && (root[ name ] = factory.call( root ));
+else if ( ('object'===typeof module)&&module.exports ) /* CommonJS */
+    module.exports = factory.call( root );
+else if ( ('function'===typeof(define))&&define.amd&&('function'===typeof(require))&&('function'===typeof(require.specified))&&require.specified(name) ) /* AMD */
+    define(name,['require','exports','module'],function( ){return factory.call( root );});
+else if ( !(name in root) ) /* Browser/WebWorker/.. */
+    (root[ name ] = (m=factory.call( root )))&&('function'===typeof(define))&&define.amd&&define(function( ){return m;} );
 }(  /* current root */          this, 
     /* module name */           "Importer",
-    /* module factory */        function( exports, undef ) {
+    /* module factory */        function( undef ) {
 "use strict";
 
 var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 'toLowerCase',
     toString = Object[PROTO].toString, map = Array[PROTO].map,
     
-    isNode = ("undefined" !== typeof global) && ("[object global]" === toString.call(global)),
-    isWebWorker = !isNode && ('undefined' !== typeof WorkerGlobalScope) && ("function" === typeof importScripts) && (navigator instanceof WorkerNavigator),
-    isBrowser = !isNode && !isWebWorker && ("undefined" !== typeof navigator), 
+    isXPCOM = ("undefined" !== typeof Components) && ("object" === typeof Components.classes) && ("object" === typeof Components.classesByID) && Components.utils && ("function" === typeof Components.utils['import']),
+    isNode = !isXPCOM && ("undefined" !== typeof global) && ("[object global]" === toString.call(global)),
+    isWebWorker = !isXPCOM && !isNode && ('undefined' !== typeof WorkerGlobalScope) && ("function" === typeof importScripts) && (navigator instanceof WorkerNavigator),
+    isBrowser = !iisXPCOM && !isNode && !isWebWorker && ("undefined" !== typeof navigator), 
     
-    Scope = isNode ? global : (isWebWorker ? this : window),
+    Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
     
     DS = '/', DS_RE = /\/|\\/g, PROTOCOL = '://', PROTOCOL_RE = '#PROTOCOL#',
     ID_RE = /[\-.\/\\:]+/g,
@@ -45,15 +38,41 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
             : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
     
     
-    read_file = isNode
-    ? function( path, enc ) {
-        var fs = require('fs');
-        return 'binary' === enc
-            ? fs.readFileSync(path)
-            : fs.readFileSync(path, {encoding:enc})/*.toString()*/
-        ;
+    read_file = isXPCOM
+    ? function read_file( path, enc ) {
+        var data, file, stream, len;
+        // https://developer.mozilla.org/en-US/Add-ons/Code_snippets/File_I_O
+        Components.utils.import("resource://gre/modules/FileUtils.jsm");
+        file = new FileUtils.File( path );
+        stream = Components.classes["@mozilla.org/network/file-input-stream;1"].createInstance(Components.interfaces.nsIFileInputStream);
+        if ( 'binary' === enc )
+        {
+            var bstream = Components.classes["@mozilla.org/binaryinputstream;1"].createInstance(Components.interfaces.nsIBinaryInputStream);
+            stream.init(file, -1, -1, false);
+            len = stream.available( );
+            bstream.setInputStream( stream );
+            bstream.readByteArray( len, data = new Uint8Array( len ) );
+            bstream.close( );
+        }
+        else
+        {
+            var cstream = Components.classes["@mozilla.org/intl/converter-input-stream;1"].createInstance(Components.interfaces.nsIConverterInputStream), str = {}, read = 0
+            ;
+            stream.init(file, -1, 0, 0); cstream.init(stream, enc, 0, 0);
+            do { 
+                // read as much as we can and put it in str.value
+                read = cstream.readString(0xffffffff, str);
+                data += str.value;
+            } while (0 != read);
+            cstream.close(); // this closes stream
+        }
+        return data;
     }
-    : function( path, enc ) {
+    : (isNode
+    ? function read_file( path, enc ) {
+        return require('fs').readFileSync( path, 'binary' === enc ? {} : {encoding:enc} );
+    }
+    : function read_file( path, enc ) {
         var xhr = window.XMLHttpRequest
             // code for IE7+, Firefox, Chrome, Opera, Safari
             ? new XMLHttpRequest( )
@@ -80,9 +99,36 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
             return 'binary' === enc ? xhr.response : xhr.responseText;
         else
             return 'binary' === enc ? null : '';
-    },
-    read_file_async = isNode
-    ? function( path, enc, cb ) {
+    }),
+    read_file_async = isXPCOM
+    ? function read_file_async( path, enc, cb ) {
+        // https://developer.mozilla.org/en-US/Add-ons/Code_snippets/File_I_O
+        Components.utils.import("resource://gre/modules/NetUtil.jsm");
+        NetUtil.asyncFetch(path, function( stream, status ) {
+            var data;
+            if ( Components.isSuccessCode( status ) )
+            {
+                if ( 'binary' === enc )
+                {
+                    var bstream = Components.classes["@mozilla.org/binaryinputstream;1"].createInstance(Components.interfaces.nsIBinaryInputStream), len = stream.available( );
+                    bstream.setInputStream( stream );
+                    bstream.readByteArray( len, data = new Uint8Array( len ) );
+                    bstream.close( );
+                }
+                else
+                {
+                    data = NetUtil.readInputStreamToString( stream, stream.available(), {charset:enc} );
+                }
+            }
+            else
+            {
+                data = 'binary' === enc ? null : '';
+            }
+            if ( cb ) cb( data );
+        });
+    }
+    : (isNode
+    ? function read_file_async( path, enc, cb ) {
         var fs = require('fs');
         if ( 'binary' === enc )
         {
@@ -98,7 +144,7 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
         }
         return '';
     }
-    : function( path, enc, cb ) {
+    : function read_file_async( path, enc, cb ) {
         var xhr = window.XMLHttpRequest
             // code for IE7+, Firefox, Chrome, Opera, Safari
             ? new XMLHttpRequest( )
@@ -128,7 +174,7 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
         }
         xhr.send( null );
         return '';
-    },
+    }),
     
     Importer
 ;
@@ -337,8 +383,30 @@ function load_deps( importer, scope, cache, ref, complete )
 {
     var dl = ref.length, i, t, cached,
         head, load, next, loaded = new Array( dl );
+    // xpcom module
+    if ( isXPCOM )
+    {
+            if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
+            else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[ i ].cache_id ] = read_file( ref[ i ].path, 'UTF-8' );
+            else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
+            else
+            {                
+                Components.utils['import']( ref[ i ].path, scope );
+                loaded[ i ] = scope[ ref[ i ].name ] || null;
+                // hook here
+                importer.trigger("import-class", [
+                    //          this,     id,        classname,   path,        reference
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                ]).trigger("import-class-"+ref[i].id, [
+                    //          this,     id,        classname,   path,        reference
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                ]);
+            }
+        }
+        return complete.apply( scope, loaded );
+    }
     // nodejs, require
-    if ( isNode )
+    else if ( isNode )
     {
         for (i=0; i<dl; i++) 
         {
@@ -519,6 +587,31 @@ function add_protocol( p )
     return p.split( PROTOCOL_RE ).join( PROTOCOL );
 }
 
+function path_join( )
+{
+    if ( !arguments.length ) return '.';
+    var p, args = arguments, full = '.';
+    if ( isXPCOM )
+    {
+        Components.utils.import("resource://gre/modules/osfile.jsm");
+        full = OS.Path.join.apply( OS.Path, args );
+    }
+    else if ( isNode )
+    {
+        p = require('path');
+        full = p.join.apply( p, args );
+    }
+    /*else if ( isBrowser && !isWebWorker )
+    {
+        if ( !path_join.link ) path_join.link = document.createElement('a');
+        path_join.link.href = slice.call( args ).join( '/' );
+    }*/
+    else
+    {
+        full = join_path.apply( null, args );
+    }
+    return full;
+}
 // adapted from https://github.com/JosephMoniz/php-path
 function join_path( ) 
 {
@@ -583,8 +676,9 @@ Importer = function Importer( base, base_url ) {
     self._cache = { };
 };
 
-Importer.VERSION = '0.3.0';
+Importer.VERSION = '0.3.1';
 Importer.BASE = './';
+Importer.path_join = path_join;
 Importer.join_path = join_path;
 
 Importer[PROTO] = {
