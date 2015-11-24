@@ -1,6 +1,6 @@
 /**
 *  Importer
-*  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/JS
+*  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
 *  @version 0.3.1
 *  https://github.com/foo123/Importer
@@ -23,24 +23,31 @@ else if ( !(name in root) ) /* Browser/WebWorker/.. */
 
 var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 'toLowerCase',
     toString = Object[PROTO].toString, map = Array[PROTO].map,
-    NOP = function( ){ },
-    
     startsWith = String[PROTO].startsWith 
             ? function( s, pre, pos ){return s.startsWith(pre, pos||0);} 
             : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
+    NOP = function( ){ },
     
     isXPCOM = ("undefined" !== typeof Components) && ("object" === typeof Components.classes) && ("object" === typeof Components.classesByID) && Components.utils && ("function" === typeof Components.utils['import']),
     isNode = !isXPCOM && ("undefined" !== typeof global) && ("[object global]" === toString.call(global)),
     isWebWorker = !isXPCOM && !isNode && ('undefined' !== typeof WorkerGlobalScope) && ("function" === typeof importScripts) && (navigator instanceof WorkerNavigator),
-    isBrowser = !iisXPCOM && !isNode && !isWebWorker && ("undefined" !== typeof navigator), 
+    isBrowser = !isXPCOM && !isNode && !isWebWorker && ("undefined" !== typeof navigator)
+;
     
-    Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
+if ( isXPCOM )
+{
+    // do some necessary imports
+    import_("resource://gre/modules/NetUtil.jsm");
+    import_("resource://gre/modules/osfile.jsm");
+}
+
+var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
     
-    Cu = isXPCOM ? Components.utils : {},
-    Cc = isXPCOM ? Components.classes : {},
-    Ci = isXPCOM ? Components.interfaces : {},
+    Cu = isXPCOM ? Components.utils : null,
+    Cc = isXPCOM ? Components.classes : null,
+    Ci = isXPCOM ? Components.interfaces : null,
     import_ = isXPCOM ? Cu['import'] : (isNode ? require : NOP),
-    fs = isNode ? import_('fs') : {},
+    fs = isNode ? import_('fs') : null,
     import_module = isXPCOM
     ? function import_module( name, path, scope ) {
         import_( path, scope );
@@ -77,12 +84,21 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     ? import_('path').sep /* https://nodejs.org/api/path.html#path_path_sep */
     : '/'),
     
+    fileurl_2_nsfile = function( file_uri ) {
+        // NetUtil.newURI(file_uri).QueryInterface(Ci.nsIFileURL).file
+        // http://stackoverflow.com/q/24817347/3591273
+        /*var ios = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService),
+            url = ios.newURI(file_uri, null, null), // url is a nsIURI
+            // file is a nsIFile    
+            file = url.QueryInterface(Ci.nsIFileURL).file;*/
+        return Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService).newURI(file_uri, null, null).QueryInterface(Ci.nsIFileURL).file;
+    },
+    
     read_file = isXPCOM
     ? function read_file( path, enc ) {
         var data, file, stream, len;
         // https://developer.mozilla.org/en-US/Add-ons/Code_snippets/File_I_O
-        import_("resource://gre/modules/FileUtils.jsm");
-        file = new FileUtils.File( path );
+        file = fileurl_2_nsfile( path );
         stream = Cc["@mozilla.org/network/file-input-stream;1"].createInstance(Ci.nsIFileInputStream);
         if ( 'binary' === enc )
         {
@@ -137,8 +153,7 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     read_file_async = isXPCOM
     ? function read_file_async( path, enc, cb ) {
         // https://developer.mozilla.org/en-US/Add-ons/Code_snippets/File_I_O
-        import_("resource://gre/modules/NetUtil.jsm");
-        NetUtil.asyncFetch(path, function( stream, status ) {
+        NetUtil.asyncFetch(fileurl_2_nsfile( path ), function( stream, status ) {
             var data;
             if ( Components.isSuccessCode( status ) )
             {
@@ -161,6 +176,7 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
             }
             if ( cb ) cb( data );
         });
+        return '';
     }
     : (isNode
     ? function read_file_async( path, enc, cb ) {
@@ -208,7 +224,7 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     Importer
 ;
 
-// load javascript(s)/text(s) (a)sync in node, browser, webworker, xpcom module
+// load javascript(s)/text(s) (a)sync in node, browser, webworker, xpcom/sdk module
 function load_deps( importer, scope, cache, ref, complete )
 {
     var dl = ref.length, i, t, cached,
@@ -573,10 +589,9 @@ function add_protocol( p )
 function path_join( )
 {
     var p, args = arguments, full = '.';
-    !args.length && (return full);
+    if ( !args.length ) return full;
     if ( isXPCOM )
     {
-        import_("resource://gre/modules/osfile.jsm");
         full = OS.Path.join.apply( OS.Path, args );
     }
     else if ( isNode )
@@ -1056,7 +1071,7 @@ Importer[PROTO] = {
                 self.import_asset( to_load[i] );
             out = '';
         }
-        else //if ( isNode || isWebWorker )
+        else //if ( isXPCOM || isNode || isWebWorker )
         {
             out = [ ];
             for (i=0,l=to_load.length; i<l; i++)
@@ -1103,7 +1118,7 @@ Importer[PROTO] = {
         var self = this, encoding;
         path = self.path( path );
         opts = opts || { };
-        encoding = opts.encoding || 'utf8';
+        encoding = opts.encoding || (isXPCOM ? 'UTF-8' : 'utf8');
         if ( !empty(opts.binary) ) encoding = 'binary';
         complete = complete || opts.complete || (is_callable( opts ) && opts);
         if ( isBrowser )
@@ -1166,12 +1181,14 @@ Importer[PROTO] = {
     }
 }
 
-Importer.BASE = isNode
+Importer.BASE = isXPCOM
+    ? './'
+    : (isNode
     ? __dirname
     : (isWebWorker
     ? this.location.href.split('/').slice(0,-1).join('/')
     : ($$tag('script', -1).src||'./').split('/').slice(0,-1).join('/') // absolute uri
-);
+));
 
 // export it
 return Importer;

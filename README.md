@@ -1,3 +1,3 @@
 # Importer
 
-Importer, a simple loader manager for classes and assets with dependencies for PHP, Python, Node/JS
+Importer, a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
