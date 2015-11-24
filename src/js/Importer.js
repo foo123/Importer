@@ -112,7 +112,8 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         else
         {
             var cstream = Cc["@mozilla.org/intl/converter-input-stream;1"].createInstance(Ci.nsIConverterInputStream),
-                str = {}, read = 0;
+                str = {value:''}, read = 0;
+            data = '';
             stream.init(file, -1, 0, 0); cstream.init(stream, enc, 0, 0);
             do { 
                 // read as much as we can and put it in str.value
