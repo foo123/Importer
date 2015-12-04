@@ -2,7 +2,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.1
+*  @version 0.3.2
 *  https://github.com/foo123/Importer
 **/
 !function( root, name, factory ) {
@@ -12,7 +12,9 @@ if ( ('undefined'!==typeof Components)&&('object'===typeof Components.classes)&&
     (root.EXPORTED_SYMBOLS = [ name ]) && (root[ name ] = factory.call( root ));
 else if ( ('object'===typeof module)&&module.exports ) /* CommonJS */
     module.exports = factory.call( root );
-else if ( ('function'===typeof(define))&&define.amd&&('function'===typeof(require))&&('function'===typeof(require.specified))&&require.specified(name) ) /* AMD */
+else if ( ('undefined'!==typeof System)&&('function'===typeof System.register)&&('function'===typeof System['import']) ) /* ES6 module */
+    System.register(name,[],function( $__export ){$__export(name, factory.call( root ));});
+else if ( ('function'===typeof define)&&define.amd&&('function'===typeof require)&&('function'===typeof require.specified)&&require.specified(name) ) /* AMD */
     define(name,['require','exports','module'],function( ){return factory.call( root );});
 else if ( !(name in root) ) /* Browser/WebWorker/.. */
     (root[ name ] = (m=factory.call( root )))&&('function'===typeof(define))&&define.amd&&define(function( ){return m;} );
@@ -31,9 +33,17 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     isXPCOM = ("undefined" !== typeof Components) && ("object" === typeof Components.classes) && ("object" === typeof Components.classesByID) && Components.utils && ("function" === typeof Components.utils['import']),
     isNode = !isXPCOM && ("undefined" !== typeof global) && ("[object global]" === toString.call(global)),
     isWebWorker = !isXPCOM && !isNode && ('undefined' !== typeof WorkerGlobalScope) && ("function" === typeof importScripts) && (navigator instanceof WorkerNavigator),
-    isBrowser = !isXPCOM && !isNode && !isWebWorker && ("undefined" !== typeof navigator)
+    isBrowser = !isXPCOM && !isNode && !isWebWorker && ("undefined" !== typeof navigator),
+    isAMD = ('function' === typeof define) && define.amd && ('function' === typeof require),
+    isESModule = !isXPCOM && !isNode && ('undefined' !== typeof System) && ('function' === typeof System.register) && ('function' === typeof System['import'])
 ;
     
+/*
+  System.import('module').then(function(module) {
+    // ..
+  });
+*/
+
 if ( isXPCOM )
 {
     // do some necessary imports
@@ -675,7 +685,7 @@ Importer = function Importer( base, base_url ) {
     self._cache = { };
 };
 
-Importer.VERSION = '0.3.1';
+Importer.VERSION = '0.3.2';
 Importer.BASE = './';
 Importer.path_join = path_join;
 Importer.join_path = join_path;
