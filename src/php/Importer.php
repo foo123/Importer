@@ -13,7 +13,7 @@ class Importer
     const VERSION = '0.3.2';
     
     const DS = '/';
-    const DS_RE = '#/|\\#';
+    const DS_RE = '/\\/|\\\\/';
     const PROTOCOL = '://';
     const PROTOCOL_RE = '#PROTOCOL#';
     
