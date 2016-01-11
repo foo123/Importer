@@ -2,7 +2,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.2
+*  @version 0.3.3
 *  https://github.com/foo123/Importer
 **/
 !function( root, name, factory ) {
@@ -685,7 +685,7 @@ Importer = function Importer( base, base_url ) {
     self._cache = { };
 };
 
-Importer.VERSION = '0.3.2';
+Importer.VERSION = '0.3.3';
 Importer.BASE = './';
 Importer.path_join = path_join;
 Importer.join_path = join_path;
@@ -844,14 +844,19 @@ Importer[PROTO] = {
                     type = def[0]; id = def[1]; asset = def[2]; deps = def[3] ? def[3] : [];
                     if ( !empty( type ) && !empty( id ) && !empty( asset ) ) 
                     {
+                        type = type[LOWER]( );
+                        if ( 'scripts-composite' === type || 'styles-composite' === type )
+                        {
+                            asset = array(asset);
+                        }
+                        // maybe literal asset
+                        else if ( is_string( asset ) )
+                        {
+                            asset = self.path_url( asset );
+                        }
                         assets[ id ] = [
-                            /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded */
-                            type[LOWER]( ), 
-                            id, 
-                            is_string( asset ) ? self.path_url( asset ) : asset, 
-                            array(deps), 
-                            false, 
-                            false
+                            /* 0:type, 1:id, 2:asset, 3:deps, 4:enqueued, 5:loaded */
+                            type, id, asset, array(deps), false, false
                         ];
                     }
                 }
@@ -945,7 +950,7 @@ Importer[PROTO] = {
     ,import_asset: function( id ) {
         var self = this, queue = [ id ], assets = self._assets, deps,
             needs_deps, numdeps, i, dep, out = [ ], asset_def, type, asset, asset_id,
-            is_style, is_script, is_tpl, is_inlined, document_asset, ret;
+            is_style, is_script, is_tpl, is_composite, is_inlined, pi, pl, document_asset, ret;
         while ( queue.length )
         {
             id = queue[ 0 ];
@@ -992,43 +997,156 @@ Importer[PROTO] = {
                 }
                 else
                 {
-                    is_style = 'styles' === type;
-                    is_script = 'scripts' === type;
+                    is_style = 'styles' === type || 'styles-composite' === type;
+                    is_script = 'scripts' === type || 'scripts-composite' === type;
                     is_tpl = 'templates' === type;
-                    is_inlined = is_array( asset );
+                    is_composite = 'scripts-composite' === type || 'styles-composite' === type;
+                    is_inlined = !is_composite && is_array( asset );
                     asset_id = id.replace(ID_RE, '_');
                     if ( is_style )
                     {
                         if ( isBrowser )
                         {
-                            out.push( document_asset = is_inlined
-                                ? $$("importer-inline-style-"+asset_id) || $$asset( 'style', asset[0] )
-                                : $$("importer-style-"+asset_id) || $$asset( 'style-link', self.path_url(asset), true ) );
-                            document_asset[ATTR]('id', is_inlined ? "importer-inline-style-"+asset_id : "importer-style-"+asset_id);
+                            if ( is_inlined )
+                            {
+                                out.push(
+                                document_asset = $$("importer-inline-style-"+asset_id) || $$asset( 'style', asset[0] )
+                                );
+                                document_asset[ATTR]('id', "importer-inline-style-"+asset_id);
+                            }
+                            else if ( is_composite )
+                            {
+                                for (pi=0,pl=asset.length; pi<pl; pi++)
+                                {
+                                    if ( is_array(asset[pi]) )
+                                    {
+                                        out.push(
+                                        document_asset = $$("importer-inline-style-"+asset_id+"-part-"+pi) || $$asset( 'style', asset[pi][0] )
+                                        );
+                                        document_asset[ATTR]('id', "importer-inline-style-"+asset_id+"-part-"+pi);
+                                    }
+                                    else
+                                    {
+                                        out.push(
+                                        document_asset = $$("importer-style-"+asset_id+"-part-"+pi) || $$asset( 'style-link', self.path_url(asset[pi]), true )
+                                        );
+                                        document_asset[ATTR]('id', "importer-style-"+asset_id+"-part-"+pi);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                out.push(
+                                document_asset = $$("importer-style-"+asset_id) || $$asset( 'style-link', self.path_url(asset), true )
+                                );
+                                document_asset[ATTR]('id', "importer-style-"+asset_id);
+                            }
                         }
                         else
                         {
-                            out.push( is_inlined
-                                    ? ("<style id=\"importer-inline-style-"+asset_id+"\" type=\"text/css\" media=\"all\">"+asset[0]+"</style>")
-                                    : ("<link id=\"importer-style-"+asset_id+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+self.path_url(asset)+"\" media=\"all\" />")
-                            );
+                            if ( is_inlined )
+                            {
+                                out.push(
+                                "<style id=\"importer-inline-style-"+asset_id+"\" type=\"text/css\" media=\"all\">"+asset[0]+"</style>"
+                                );
+                            }
+                            else if ( is_composite )
+                            {
+                                for (pi=0,pl=asset.length; pi<pl; pi++)
+                                {
+                                    if ( is_array(asset[pi]) )
+                                    {
+                                        out.push(
+                                        "<style id=\"importer-inline-style-"+asset_id+"-part-"+pi+"\" type=\"text/css\" media=\"all\">"+asset[pi][0]+"</style>"
+                                        );
+                                    }
+                                    else
+                                    {
+                                        out.push(
+                                        "<link id=\"importer-style-"+asset_id+"-part-"+pi+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+self.path_url(asset[pi])+"\" media=\"all\" />"
+                                        );
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                out.push(
+                                "<link id=\"importer-style-"+asset_id+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+self.path_url(asset)+"\" media=\"all\" />"
+                                );
+                            }
                         }
                     }
                     else if ( is_script )
                     {
                         if ( isBrowser )
                         {
-                            out.push( document_asset = is_inlined
-                                ? $$("importer-inline-script-"+asset_id) || $$asset( 'script', "/*<![CDATA[*/ "+asset[0]+" /*]]>*/" )
-                                : $$("importer-script-"+asset_id) || $$asset( 'script-link', self.path_url(asset), true ) );
-                            document_asset[ATTR]('id', is_inlined ? "importer-inline-script-"+asset_id : "importer-script-"+asset_id);
+                            if ( is_inlined )
+                            {
+                                out.push(
+                                document_asset = $$("importer-inline-script-"+asset_id) || $$asset( 'script', "/*<![CDATA[*/ "+asset[0]+" /*]]>*/" )
+                                );
+                                document_asset[ATTR]('id', "importer-inline-script-"+asset_id);
+                            }
+                            else if ( is_composite )
+                            {
+                                for (pi=0,pl=asset.length; pi<pl; pi++)
+                                {
+                                    if ( is_array(asset[pi]) )
+                                    {
+                                        out.push(
+                                        document_asset = $$("importer-inline-script-"+asset_id+"-part-"+pi) || $$asset( 'script', "/*<![CDATA[*/ "+asset[pi][0]+" /*]]>*/" )
+                                        );
+                                        document_asset[ATTR]('id', "importer-inline-script-"+asset_id+"-part-"+pi);
+                                    }
+                                    else
+                                    {
+                                        out.push(
+                                        document_asset = $$("importer-script-"+asset_id+"-part-"+pi) || $$asset( 'script-link', self.path_url(asset[pi]), true )
+                                        );
+                                        document_asset[ATTR]('id', "importer-script-"+asset_id+"-part-"+pi);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                out.push(
+                                document_asset = $$("importer-script-"+asset_id) || $$asset( 'script-link', self.path_url(asset), true )
+                                );
+                                document_asset[ATTR]('id', "importer-script-"+asset_id);
+                            }
                         }
                         else
                         {
-                            out.push( is_inlined
-                                    ? ("<script id=\"importer-inline-script-"+asset_id+"\" type=\"text/javascript\">/*<![CDATA[*/ "+asset[0]+" /*]]>*/</script>")
-                                    : ("<script id=\"importer-script-"+asset_id+"\" type=\"text/javascript\" src=\""+self.path_url(asset)+"\"></script>")
-                            );
+                            if ( is_inlined )
+                            {
+                                out.push(
+                                "<script id=\"importer-inline-script-"+asset_id+"\" type=\"text/javascript\">/*<![CDATA[*/ "+asset[0]+" /*]]>*/</script>"
+                                );
+                            }
+                            else if ( is_composite )
+                            {
+                                for (pi=0,pl=asset.length; pi<pl; pi++)
+                                {
+                                    if ( is_array(asset[pi]) )
+                                    {
+                                        out.push(
+                                        "<script id=\"importer-inline-script-"+asset_id+"-part-"+pi+"\" type=\"text/javascript\">/*<![CDATA[*/ "+asset[pi][0]+" /*]]>*/</script>"
+                                        );
+                                    }
+                                    else
+                                    {
+                                        out.push(
+                                        "<script id=\"importer-script-"+asset_id+"-part-"+pi+"\" type=\"text/javascript\" src=\""+self.path_url(asset[pi])+"\"></script>"
+                                        );
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                out.push(
+                                "<script id=\"importer-script-"+asset_id+"\" type=\"text/javascript\" src=\""+self.path_url(asset)+"\"></script>"
+                                );
+                            }
                         }
                     }
                     else if ( is_tpl )
@@ -1064,14 +1182,15 @@ Importer[PROTO] = {
     
     ,assets: function( type ) {
         var self = this, out, assets = self._assets, next,
-            id, asset_def, i, l, to_load = [ ];
+            id, asset_def, i, l, to_load = [ ], type_composite;
         if ( !arguments.length ) type = "scripts";
         type = type[LOWER]( );
+        type_composite = type + '-composite';
         for (id in assets)
         {
             if ( !assets[HAS](id) ) continue;
             asset_def = assets[id];
-            if ( type === asset_def[0] && asset_def[4] && !asset_def[5] )
+            if ( (type === asset_def[0] || type_composite === asset_def[0]) && asset_def[4] && !asset_def[5] )
             {
                 to_load.push( asset_def[1] );
             }

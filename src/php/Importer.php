@@ -1,16 +1,16 @@
 <?php
 /**
 *  Importer
-*  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/JS
+*  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.2
+*  @version 0.3.3
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer') )
 { 
 class Importer
 {
-    const VERSION = '0.3.2';
+    const VERSION = '0.3.3';
     
     const DS = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -252,15 +252,19 @@ class Importer
                     $type = $def[0]; $id = $def[1]; $asset = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     if ( !empty( $type ) && !empty( $id ) && !empty( $asset ) ) 
                     {
+                        $type = strtolower($type);
+                        if ( 'scripts-composite' === $type || 'styles-composite' === $type )
+                        {
+                            $asset = (array)$asset;
+                        }
+                        // maybe literal asset
+                        elseif ( is_string( $asset ) )
+                        {
+                            $asset = $this->path_url( $asset );
+                        }
                         $this->_assets[ $id ] = array(
-                            /* 0:type,         1:id, 2:asset, 3:deps,   4:enqueued, 5:loaded */
-                            strtolower($type), 
-                            $id, 
-                            // maybe literal asset
-                            is_string( $asset ) ? $this->path_url( $asset ) : $asset,
-                            (array)$deps, 
-                            false, 
-                            false
+                            /* 0:type, 1:id, 2:asset, 3:deps, 4:enqueued, 5:loaded */
+                            $type, $id, $asset, (array)$deps, false, false
                         );
                     }
                 }
@@ -369,22 +373,61 @@ class Importer
                 }
                 else
                 {
-                    $is_style = (bool)('styles' === $type);
-                    $is_script = (bool)('scripts' === $type);
+                    $is_style = (bool)('styles' === $type || 'styles-composite' === $type);
+                    $is_script = (bool)('scripts' === $type || 'scripts-composite' === $type);
                     $is_tpl = (bool)('templates' === $type);
-                    $is_inlined = is_array($asset);
+                    $is_composite = (bool)('scripts-composite' === $type || 'styles-composite' === $type);
+                    $is_inlined = !$is_composite && is_array($asset);
                     $asset_id = preg_replace( '/[\\-.\\/\\\\:]+/', '_', $id);
                     if ( $is_style )
                     {
-                        $out[] = $is_inlined
-                                ? ("<style id=\"importer-inline-style-{$asset_id}\" type=\"text/css\" media=\"all\">{$asset[0]}</style>")
-                                : ("<link id=\"importer-style-{$asset_id}\" type=\"text/css\" rel=\"stylesheet\" href=\"".$this->path_url($asset)."\" media=\"all\" />");
+                        if ( $is_inlined )
+                        {
+                            $out[] = "<style id=\"importer-inline-style-{$asset_id}\" type=\"text/css\" media=\"all\">{$asset[0]}</style>";
+                        }
+                        elseif ( $is_composite )
+                        {
+                            foreach($asset as $pi=>$part)
+                            {
+                                if ( is_array($part) )
+                                {
+                                    $out[] = "<style id=\"importer-inline-style-{$asset_id}-part-{$pi}\" type=\"text/css\" media=\"all\">{$part[0]}</style>";
+                                }
+                                else
+                                {
+                                    $out[] = "<link id=\"importer-style-{$asset_id}-part-{$pi}\" type=\"text/css\" rel=\"stylesheet\" href=\"".$this->path_url($part)."\" media=\"all\" />";
+                                }
+                            }
+                        }
+                        else
+                        {
+                            $out[] = "<link id=\"importer-style-{$asset_id}\" type=\"text/css\" rel=\"stylesheet\" href=\"".$this->path_url($asset)."\" media=\"all\" />";
+                        }
                     }
                     elseif ( $is_script )
                     {
-                        $out[] = $is_inlined
-                                ? ("<script id=\"importer-inline-script-{$asset_id}\" type=\"text/javascript\">/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>")
-                                : ("<script id=\"importer-script-{$asset_id}\" type=\"text/javascript\" src=\"".$this->path_url($asset)."\"></script>");
+                        if ( $is_inlined )
+                        {
+                            $out[] = "<script id=\"importer-inline-script-{$asset_id}\" type=\"text/javascript\">/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>";
+                        }
+                        elseif ( $is_composite )
+                        {
+                            foreach($asset as $pi=>$part)
+                            {
+                                if ( is_array($part) )
+                                {
+                                    $out[] = "<script id=\"importer-inline-script-{$asset_id}-part-{$pi}\" type=\"text/javascript\">/*<![CDATA[*/ {$part[0]} /*]]>*/</script>";
+                                }
+                                else
+                                {
+                                    $out[] = "<script id=\"importer-script-{$asset_id}-part-{$pi}\" type=\"text/javascript\" src=\"".$this->path_url($part)."\"></script>";
+                                }
+                            }
+                        }
+                        else
+                        {
+                            $out[] = "<script id=\"importer-script-{$asset_id}\" type=\"text/javascript\" src=\"".$this->path_url($asset)."\"></script>";
+                        }
                     }
                     elseif ( $is_tpl )
                     {
@@ -410,9 +453,10 @@ class Importer
     {
         $out = array( );
         $type = strtolower($type);
+        $type_composite = $type . '-composite';
         foreach ($this->_assets as $asset_def)
         {
-            if ( $type === $asset_def[0] && $asset_def[4] && !$asset_def[5] )
+            if ( ($type === $asset_def[0] || $type_composite === $asset_def[0]) && $asset_def[4] && !$asset_def[5] )
                 $out = array_merge($out, $this->import_asset($asset_def[1]));
         }
         return implode("\n", $out);
