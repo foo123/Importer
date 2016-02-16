@@ -1,4 +1,4 @@
-Importer.VERSION = 0.3.0
+Importer.VERSION = 0.3.4
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\js
 Test1.js
 Test2.js
@@ -12,10 +12,10 @@ Callback
      _cache: {} },
   '1': 'Test2',
   '2': 'Test2',
-  '3': 'C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test2.js',
+  '3': 'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test\\classes\\Test2.js',
   '4': { Test2: [Function: Test2] } }
-<link id="importer-style-asset1" type="text/css" rel="stylesheet" href="http://_mygit/Importer/test/assets/asset1.css" media="all" />
-<link id="importer-style-asset2" type="text/css" rel="stylesheet" href="http://_mygit/Importer/test/assets/asset2.css" media="all" />
+<link id="importer-style-asset1" type="text/css" rel="stylesheet" href="http://_mygit\Importer\test\assets\asset1.css" media="all" />
+<link id="importer-style-asset2" type="text/css" rel="stylesheet" href="http://_mygit\Importer\test\assets\asset2.css" media="all" />
 <style id="importer-inline-style-asset3" type="text/css" media="all">/* asset 3 */</style>
 function Test1( )
 {

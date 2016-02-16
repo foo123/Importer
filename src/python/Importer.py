@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 ##
 #  Importer
-#  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/JS
+#  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 #
 #  @version 0.3.0
 #  https://github.com/foo123/Importer

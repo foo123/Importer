@@ -3,14 +3,14 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.3
+*  @version 0.3.4
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer') )
 { 
 class Importer
 {
-    const VERSION = '0.3.3';
+    const VERSION = '0.3.4';
     
     const DS = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -497,19 +497,22 @@ class Importer
     
     public function get( $path, $opts=array() )
     {
+        $default_value = isset($opts['default']) ? $opts['default'] : '';
         if ( !empty($opts['binary']) )
         {
-            $fp = fopen( $this->path( $path ), "rb" );
+            $file = $this->path( $path );
+            $fp = fopen( $file, "rb" );
             if ( $fp )
             {
                 $data = @fread( $fp );
                 fclose( $fp );
             }
-            else $data = '';
+            else $data = $default_value;
         }
         else
         {
-            $data = @file_get_contents( $this->path( $path ) );
+            $file = $this->path( $path );
+            $data = is_file( $file ) ? @file_get_contents( $file ) : $default_value;
         }
         return $data;
     }

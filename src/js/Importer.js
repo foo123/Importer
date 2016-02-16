@@ -2,7 +2,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.3
+*  @version 0.3.4
 *  https://github.com/foo123/Importer
 **/
 !function( root, name, factory ) {
@@ -35,7 +35,10 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
     isWebWorker = !isXPCOM && !isNode && ('undefined' !== typeof WorkerGlobalScope) && ("function" === typeof importScripts) && (navigator instanceof WorkerNavigator),
     isBrowser = !isXPCOM && !isNode && !isWebWorker && ("undefined" !== typeof navigator),
     isAMD = ('function' === typeof define) && define.amd && ('function' === typeof require),
-    isESModule = !isXPCOM && !isNode && ('undefined' !== typeof System) && ('function' === typeof System.register) && ('function' === typeof System['import'])
+    isESModule = !isXPCOM && !isNode && ('undefined' !== typeof System) && ('function' === typeof System.register) && ('function' === typeof System['import']),
+    Cu = isXPCOM ? Components.utils : null,
+    Cc = isXPCOM ? Components.classes : null,
+    Ci = isXPCOM ? Components.interfaces : null
 ;
     
 /*
@@ -47,29 +50,25 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
 if ( isXPCOM )
 {
     // do some necessary imports
-    import_("resource://gre/modules/NetUtil.jsm");
-    import_("resource://gre/modules/osfile.jsm");
+    Cu['import']("resource://gre/modules/NetUtil.jsm");
+    Cu['import']("resource://gre/modules/osfile.jsm");
 }
 
 var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
     
-    Cu = isXPCOM ? Components.utils : null,
-    Cc = isXPCOM ? Components.classes : null,
-    Ci = isXPCOM ? Components.interfaces : null,
-    import_ = isXPCOM ? Cu['import'] : (isNode ? require : NOP),
-    fs = isNode ? import_('fs') : null,
+    fs = isNode ? require('fs') : null,
     import_module = isXPCOM
     ? function import_module( name, path, scope ) {
-        import_( path, scope );
+        Cu['import']( path, scope );
         return scope[ name ];
     }
     : (isNode
     ? function import_module( name, path, scope ) {
-        return import_( path );
+        return require( path );
     }
     : (isWebWorker
     ? function import_module( name, path, scope ) {
-        import_( path );
+        importScripts( path );
         return scope[ name ];
     }
     : NOP)),
@@ -91,7 +90,7 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         return profil_dir.path.substr(profil_dir.path.length-("abc".length)-1,1);
     })( )
     : (isNode
-    ? import_('path').sep /* https://nodejs.org/api/path.html#path_path_sep */
+    ? require('path').sep /* https://nodejs.org/api/path.html#path_path_sep */
     : '/'),
     
     fileurl_2_nsfile = function( file_uri ) {
@@ -105,7 +104,7 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
     },
     
     read_file = isXPCOM
-    ? function read_file( path, enc ) {
+    ? function read_file( path, enc, defval ) {
         var data, file, stream, len;
         // https://developer.mozilla.org/en-US/Add-ons/Code_snippets/File_I_O
         file = fileurl_2_nsfile( path );
@@ -123,22 +122,26 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         {
             var cstream = Cc["@mozilla.org/intl/converter-input-stream;1"].createInstance(Ci.nsIConverterInputStream),
                 str = {value:''}, read = 0;
-            data = '';
+            data = null;
             stream.init(file, -1, 0, 0); cstream.init(stream, enc, 0, 0);
             do { 
                 // read as much as we can and put it in str.value
                 read = cstream.readString(0xffffffff, str);
+                if ( null === data ) data = '';
                 data += str.value;
             } while (0 != read);
             cstream.close(); // this closes stream
+            if ( null === data ) data = null != defval ? defval : '';
         }
         return data;
     }
     : (isNode
-    ? function read_file( path, enc ) {
-        return fs.readFileSync( path, 'binary' === enc ? {} : {encoding:enc} );
+    ? function read_file( path, enc, defval ) {
+        var data = fs.readFileSync( path, 'binary' === enc ? {} : {encoding:enc} );
+        if ( !data ) return 'binary' === enc ? (null != defval ? defval : null) : (null != defval ? defval : '');
+        return data;
     }
-    : function read_file( path, enc ) {
+    : function read_file( path, enc, defval ) {
         var xhr = XHR( );
         
         // plain text with enc encoding format
@@ -159,13 +162,13 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         if ( 200 === xhr.status )
             return 'binary' === enc ? xhr.response : xhr.responseText;
         else
-            return 'binary' === enc ? null : '';
+            return 'binary' === enc ? (null != defval ? defval : null) : (null != defval ? defval : '');
     }),
     read_file_async = isXPCOM
-    ? function read_file_async( path, enc, cb ) {
+    ? function read_file_async( path, enc, cb, defval ) {
         // https://developer.mozilla.org/en-US/Add-ons/Code_snippets/File_I_O
         NetUtil.asyncFetch(fileurl_2_nsfile( path ), function( stream, status ) {
-            var data;
+            var data = null;
             if ( Components.isSuccessCode( status ) )
             {
                 if ( 'binary' === enc )
@@ -183,29 +186,29 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
             }
             else
             {
-                data = 'binary' === enc ? null : '';
+                data = 'binary' === enc ? (null != defval ? defval : null) : (null != defval ? defval : '');
             }
             if ( cb ) cb( data );
         });
         return '';
     }
     : (isNode
-    ? function read_file_async( path, enc, cb ) {
+    ? function read_file_async( path, enc, cb, defval ) {
         if ( 'binary' === enc )
         {
             fs.readFile(path, function( err, data ){
-                if ( cb ) cb( !!err ? null : data );
+                if ( cb ) cb( !!err ? (null != defval ? defval : null) : data );
             });
         }
         else
         {
             fs.readFile(path, {encoding:enc}, function( err, text ){
-                if ( cb ) cb( !!err ? '' : text );
+                if ( cb ) cb( !!err ? (null != defval ? defval : '') : text );
             });
         }
         return '';
     }
-    : function read_file_async( path, enc, cb ) {
+    : function read_file_async( path, enc, cb, defval ) {
         var xhr = XHR( );
         
         // plain text with enc encoding format
@@ -214,8 +217,7 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         {
             xhr.responseType = "arraybuffer";
             xhr.onload = function( ) {
-                if ( cb )
-                    cb( 200 === xhr.status ? xhr.response : null );
+                if ( cb ) cb( 200 === xhr.status ? xhr.response : (null != defval ? defval : null) );
             };
         }
         else
@@ -224,8 +226,7 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
             xhr.setRequestHeader("Content-Type", "text/plain; charset="+enc+"");
             xhr.overrideMimeType("text/plain; charset="+enc+"");
             xhr.onload = function( ) {
-                if ( cb )
-                    cb( 200 === xhr.status ? xhr.responseText : '' );
+                if ( cb ) cb( 200 === xhr.status ? xhr.responseText : (null != defval ? defval : '') );
             };
         }
         xhr.send( null );
@@ -250,7 +251,7 @@ function load_deps( importer, scope, cache, ref, complete )
             else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
             else
             {                
-                loaded[ i ] = import_module( scope[ ref[ i ].name, ref[ i ].path, scope ] ) || null;
+                loaded[ i ] = import_module( ref[ i ].name, ref[ i ].path, scope ) || null;
                 // hook here
                 importer.trigger("import-class", [
                     //          this,     id,        classname,   path,        reference
@@ -607,7 +608,7 @@ function path_join( )
     }
     else if ( isNode )
     {
-        p = import_('path');
+        p = require('path');
         full = p.join.apply( p, args );
     }
     /*else if ( isBrowser && !isWebWorker )
@@ -685,7 +686,7 @@ Importer = function Importer( base, base_url ) {
     self._cache = { };
 };
 
-Importer.VERSION = '0.3.3';
+Importer.VERSION = '0.3.4';
 Importer.BASE = './';
 Importer.path_join = path_join;
 Importer.join_path = join_path;
@@ -1245,23 +1246,25 @@ Importer[PROTO] = {
     }
     
     ,get: function( path, opts, complete ) {
-        var self = this, encoding;
-        path = self.path( path );
+        var self = this, encoding, file, default_value;
         opts = opts || { };
+        default_value = opts[HAS]('default') ? opts['default'] : '';
         encoding = opts.encoding || (isXPCOM ? 'UTF-8' : 'utf8');
         if ( !empty(opts.binary) ) encoding = 'binary';
         complete = complete || opts.complete || (is_callable( opts ) && opts);
         if ( isBrowser )
         {
-            return read_file_async(path, encoding, function( data ){
+            file = self.path( path );
+            return read_file_async(file, encoding, function( data ){
                 if ( is_callable( complete ) ) complete( data );
-            })
+            }, default_value)
         }
         else
         {
+            file = self.path( path );
             return is_callable( complete )
-            ? read_file_async( path, encoding, complete )
-            : read_file( path, encoding );
+            ? read_file_async( file, encoding, complete, default_value )
+            : read_file( file, encoding, default_value );
         }
     }
     
