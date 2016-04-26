@@ -2,7 +2,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.4
+*  @version 0.3.5
 *  https://github.com/foo123/Importer
 **/
 !function( root, name, factory ) {
@@ -24,7 +24,7 @@ else if ( !(name in root) ) /* Browser/WebWorker/.. */
 "use strict";
 
 var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 'toLowerCase',
-    toString = Object[PROTO].toString, map = Array[PROTO].map,
+    toString = Object[PROTO].toString, map = Array[PROTO].map, KEYS = Object.keys,
     startsWith = String[PROTO].startsWith 
             ? function( s, pre, pos ){return s.startsWith(pre, pos||0);} 
             : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
@@ -415,6 +415,28 @@ function array( o )
 {
     return is_array( o ) ? o : [o];
 }
+function merge( o1, o2 )
+{
+    var k = KEYS(o2), i, l;
+    for (i=0,l=k.length; i<l; i++) o1[ k[i] ] = o2[ k[i] ];
+    return o1;
+}
+function attributes( atts, node )
+{
+    if ( !atts ) return node ? node : '';
+    var k = KEYS(atts), i, l;
+    if ( node )
+    {
+        for (i=0,l=k.length; i<l; i++) node[ATTR](k[i], atts[ k[i] ]);
+        return node;
+    }
+    else
+    {
+        var out = [];
+        for (i=0,l=k.length; i<l; i++) out.push( k[i]+'="'+atts[ k[i] ]+'"' );
+        return out.join(' ');
+    }
+}
 function $$( id )
 {
     return document.getElementById( id );
@@ -466,7 +488,7 @@ function $$css( style, css )
     return css;
 }
 
-function $$asset( type, src, unique )
+function $$asset( type, src, unique, atts )
 {
     var asset = null, link = null, i, links;
     switch( type )
@@ -477,7 +499,14 @@ function $$asset( type, src, unique )
         case "tpl":
             // Create the <script> tag
             asset = $$el("script");
-            asset[ATTR]("type", "text/x-tpl");
+            if ( atts )
+            {
+                attributes( atts, asset );
+            }
+            else
+            {
+                asset[ATTR]("type", "text/x-tpl");
+            }
             // WebKit hack :(
             asset.appendChild( document.createTextNode(src) );
             // Add the <script> element to the page
@@ -509,8 +538,15 @@ function $$asset( type, src, unique )
             {
                 // Create the <script> tag
                 asset = $$el('script');
-                asset[ATTR]("type", "text/javascript");
-                asset[ATTR]("language", "javascript");
+                if ( atts )
+                {
+                    attributes( atts, asset );
+                }
+                else
+                {
+                    asset[ATTR]("type", "text/javascript");
+                    asset[ATTR]("language", "javascript");
+                }
                 asset[ATTR]("src", src);
                 // Add the <script> element to the page
                 document.head.appendChild( asset );
@@ -521,8 +557,15 @@ function $$asset( type, src, unique )
         case "script":
             // Create the <script> tag
             asset = $$el("script");
-            asset[ATTR]("type", "text/javascript");
-            asset[ATTR]("language", "javascript");
+            if ( atts )
+            {
+                attributes( atts, asset );
+            }
+            else
+            {
+                asset[ATTR]("type", "text/javascript");
+                asset[ATTR]("language", "javascript");
+            }
             // WebKit hack :(
             asset.appendChild( document.createTextNode(src) );
             // Add the <script> element to the page
@@ -554,10 +597,17 @@ function $$asset( type, src, unique )
             {
                 // Create the <link> tag
                 asset = $$el('link');
-                // Add a media (and/or media query) here if you'd like!
-                asset[ATTR]("type", "text/css");
                 asset[ATTR]("rel", "stylesheet");
-                asset[ATTR]("media", "all");
+                if ( atts )
+                {
+                    attributes( atts, asset );
+                }
+                else
+                {
+                    // Add a media (and/or media query) here if you'd like!
+                    asset[ATTR]("type", "text/css");
+                    asset[ATTR]("media", "all");
+                }
                 asset[ATTR]("href", src);
                 // Add the <style> element to the page
                 document.head.appendChild( asset );
@@ -569,9 +619,16 @@ function $$asset( type, src, unique )
         default:
             // Create the <style> tag
             asset = $$el("style");
-            // Add a media (and/or media query) here if you'd like!
-            asset[ATTR]("type", "text/css");
-            asset[ATTR]("media", "all");
+            if ( atts )
+            {
+                attributes( atts, asset );
+            }
+            else
+            {
+                // Add a media (and/or media query) here if you'd like!
+                asset[ATTR]("type", "text/css");
+                asset[ATTR]("media", "all");
+            }
             // WebKit hack :(
             asset.appendChild( document.createTextNode("") );
             // Add the <style> element to the page
@@ -686,10 +743,11 @@ Importer = function Importer( base, base_url ) {
     self._cache = { };
 };
 
-Importer.VERSION = '0.3.4';
+Importer.VERSION = '0.3.5';
 Importer.BASE = './';
 Importer.path_join = path_join;
 Importer.join_path = join_path;
+Importer.attributes = attributes;
 
 Importer[PROTO] = {
     constructor: Importer
@@ -811,7 +869,7 @@ Importer[PROTO] = {
     
     ,register: function( what, defs ) {
         var self = this, classes = self._classes, assets = self._assets,
-            i, l, classname, def, id, path, deps, type, asset;
+            i, l, classname, def, id, path, deps, props, type, asset;
         if ( is_array( defs ) && defs.length )
         {
             if ( !is_array( defs[0] ) ) defs = [defs]; // make array of arrays
@@ -841,8 +899,9 @@ Importer[PROTO] = {
                 for (i=0,l=defs.length; i<l; i++)
                 {
                     def = defs[ i ];
-                    /* 0:type, 1:id, 2:asset, 3:deps */
+                    /* 0:type, 1:id, 2:asset, 3:deps, 4:props */
                     type = def[0]; id = def[1]; asset = def[2]; deps = def[3] ? def[3] : [];
+                    props = def[4] ? def[4] : {};
                     if ( !empty( type ) && !empty( id ) && !empty( asset ) ) 
                     {
                         type = type[LOWER]( );
@@ -856,8 +915,8 @@ Importer[PROTO] = {
                             asset = self.path_url( asset );
                         }
                         assets[ id ] = [
-                            /* 0:type, 1:id, 2:asset, 3:deps, 4:enqueued, 5:loaded */
-                            type, id, asset, array(deps), false, false
+                            /* 0:type, 1:id, 2:asset, 3:deps, 4:props, 5:enqueued, 6:loaded */
+                            type, id, asset, array(deps), props, false, false
                         ];
                     }
                 }
@@ -949,19 +1008,20 @@ Importer[PROTO] = {
     }
     
     ,import_asset: function( id ) {
-        var self = this, queue = [ id ], assets = self._assets, deps,
+        var self = this, queue = [ id ], assets = self._assets, deps, props, atts,
             needs_deps, numdeps, i, dep, out = [ ], asset_def, type, asset, asset_id,
             is_style, is_script, is_tpl, is_composite, is_inlined, pi, pl, document_asset, ret;
         while ( queue.length )
         {
             id = queue[ 0 ];
-            if ( assets[HAS](id) && assets[id][4] && !assets[id][5] ) // enqueued but not loaded yet
+            if ( assets[HAS](id) && assets[id][5] && !assets[id][6] ) // enqueued but not loaded yet
             {
                 asset_def = assets[id];
                 type = asset_def[0]; 
                 id = asset_def[1];  
                 asset = asset_def[2]; 
                 deps = asset_def[3];
+                props = asset_def[4];
                 if ( deps && deps.length )
                 {
                     needs_deps = false;
@@ -969,9 +1029,9 @@ Importer[PROTO] = {
                     for (i=numdeps-1; i>=0; i--)
                     {
                         dep = deps[i];
-                        if ( assets[HAS](dep) && !assets[dep][5] )
+                        if ( assets[HAS](dep) && !assets[dep][6] )
                         {
-                            assets[dep][4] = true; // enqueued
+                            assets[dep][5] = true; // enqueued
                             needs_deps = true;
                             queue.unshift( dep );
                         }
@@ -980,7 +1040,7 @@ Importer[PROTO] = {
                     else queue.shift( );
                 }
                 
-                asset_def[5] = true; // loaded
+                asset_def[6] = true; // loaded
                 
                 // hook here
                 ret = {};
@@ -1006,12 +1066,17 @@ Importer[PROTO] = {
                     asset_id = id.replace(ID_RE, '_');
                     if ( is_style )
                     {
+                        atts = merge({
+                            'type'  : 'text/css',
+                            'media' : 'all'
+                        }, props);
+                        
                         if ( isBrowser )
                         {
                             if ( is_inlined )
                             {
                                 out.push(
-                                document_asset = $$("importer-inline-style-"+asset_id) || $$asset( 'style', asset[0] )
+                                document_asset = $$("importer-inline-style-"+asset_id) || $$asset( 'style', asset[0], false, atts )
                                 );
                                 document_asset[ATTR]('id', "importer-inline-style-"+asset_id);
                             }
@@ -1022,14 +1087,14 @@ Importer[PROTO] = {
                                     if ( is_array(asset[pi]) )
                                     {
                                         out.push(
-                                        document_asset = $$("importer-inline-style-"+asset_id+"-part-"+pi) || $$asset( 'style', asset[pi][0] )
+                                        document_asset = $$("importer-inline-style-"+asset_id+"-part-"+pi) || $$asset( 'style', asset[pi][0], false, atts )
                                         );
                                         document_asset[ATTR]('id', "importer-inline-style-"+asset_id+"-part-"+pi);
                                     }
                                     else
                                     {
                                         out.push(
-                                        document_asset = $$("importer-style-"+asset_id+"-part-"+pi) || $$asset( 'style-link', self.path_url(asset[pi]), true )
+                                        document_asset = $$("importer-style-"+asset_id+"-part-"+pi) || $$asset( 'style-link', self.path_url(asset[pi]), true, atts )
                                         );
                                         document_asset[ATTR]('id', "importer-style-"+asset_id+"-part-"+pi);
                                     }
@@ -1038,17 +1103,18 @@ Importer[PROTO] = {
                             else
                             {
                                 out.push(
-                                document_asset = $$("importer-style-"+asset_id) || $$asset( 'style-link', self.path_url(asset), true )
+                                document_asset = $$("importer-style-"+asset_id) || $$asset( 'style-link', self.path_url(asset), true, atts )
                                 );
                                 document_asset[ATTR]('id', "importer-style-"+asset_id);
                             }
                         }
                         else
                         {
+                            atts = attributes( atts );
                             if ( is_inlined )
                             {
                                 out.push(
-                                "<style id=\"importer-inline-style-"+asset_id+"\" type=\"text/css\" media=\"all\">"+asset[0]+"</style>"
+                                "<style id=\"importer-inline-style-"+asset_id+"\" "+atts+">"+asset[0]+"</style>"
                                 );
                             }
                             else if ( is_composite )
@@ -1058,13 +1124,13 @@ Importer[PROTO] = {
                                     if ( is_array(asset[pi]) )
                                     {
                                         out.push(
-                                        "<style id=\"importer-inline-style-"+asset_id+"-part-"+pi+"\" type=\"text/css\" media=\"all\">"+asset[pi][0]+"</style>"
+                                        "<style id=\"importer-inline-style-"+asset_id+"-part-"+pi+"\" "+atts+">"+asset[pi][0]+"</style>"
                                         );
                                     }
                                     else
                                     {
                                         out.push(
-                                        "<link id=\"importer-style-"+asset_id+"-part-"+pi+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+self.path_url(asset[pi])+"\" media=\"all\" />"
+                                        "<link id=\"importer-style-"+asset_id+"-part-"+pi+"\" href=\""+self.path_url(asset[pi])+"\" rel=\"stylesheet\" "+atts+" />"
                                         );
                                     }
                                 }
@@ -1072,19 +1138,23 @@ Importer[PROTO] = {
                             else
                             {
                                 out.push(
-                                "<link id=\"importer-style-"+asset_id+"\" type=\"text/css\" rel=\"stylesheet\" href=\""+self.path_url(asset)+"\" media=\"all\" />"
+                                "<link id=\"importer-style-"+asset_id+"\" href=\""+self.path_url(asset)+"\" rel=\"stylesheet\" "+atts+" />"
                                 );
                             }
                         }
                     }
                     else if ( is_script )
                     {
+                        atts = merge({
+                            'type'  : 'text/javascript'
+                        }, props);
+                        
                         if ( isBrowser )
                         {
                             if ( is_inlined )
                             {
                                 out.push(
-                                document_asset = $$("importer-inline-script-"+asset_id) || $$asset( 'script', "/*<![CDATA[*/ "+asset[0]+" /*]]>*/" )
+                                document_asset = $$("importer-inline-script-"+asset_id) || $$asset( 'script', "/*<![CDATA[*/ "+asset[0]+" /*]]>*/", false, atts )
                                 );
                                 document_asset[ATTR]('id', "importer-inline-script-"+asset_id);
                             }
@@ -1095,14 +1165,14 @@ Importer[PROTO] = {
                                     if ( is_array(asset[pi]) )
                                     {
                                         out.push(
-                                        document_asset = $$("importer-inline-script-"+asset_id+"-part-"+pi) || $$asset( 'script', "/*<![CDATA[*/ "+asset[pi][0]+" /*]]>*/" )
+                                        document_asset = $$("importer-inline-script-"+asset_id+"-part-"+pi) || $$asset( 'script', "/*<![CDATA[*/ "+asset[pi][0]+" /*]]>*/", false, atts )
                                         );
                                         document_asset[ATTR]('id', "importer-inline-script-"+asset_id+"-part-"+pi);
                                     }
                                     else
                                     {
                                         out.push(
-                                        document_asset = $$("importer-script-"+asset_id+"-part-"+pi) || $$asset( 'script-link', self.path_url(asset[pi]), true )
+                                        document_asset = $$("importer-script-"+asset_id+"-part-"+pi) || $$asset( 'script-link', self.path_url(asset[pi]), true, atts )
                                         );
                                         document_asset[ATTR]('id', "importer-script-"+asset_id+"-part-"+pi);
                                     }
@@ -1111,17 +1181,18 @@ Importer[PROTO] = {
                             else
                             {
                                 out.push(
-                                document_asset = $$("importer-script-"+asset_id) || $$asset( 'script-link', self.path_url(asset), true )
+                                document_asset = $$("importer-script-"+asset_id) || $$asset( 'script-link', self.path_url(asset), true, atts )
                                 );
                                 document_asset[ATTR]('id', "importer-script-"+asset_id);
                             }
                         }
                         else
                         {
+                            atts = attributes( atts );
                             if ( is_inlined )
                             {
                                 out.push(
-                                "<script id=\"importer-inline-script-"+asset_id+"\" type=\"text/javascript\">/*<![CDATA[*/ "+asset[0]+" /*]]>*/</script>"
+                                "<script id=\"importer-inline-script-"+asset_id+"\" "+atts+">/*<![CDATA[*/ "+asset[0]+" /*]]>*/</script>"
                                 );
                             }
                             else if ( is_composite )
@@ -1131,13 +1202,13 @@ Importer[PROTO] = {
                                     if ( is_array(asset[pi]) )
                                     {
                                         out.push(
-                                        "<script id=\"importer-inline-script-"+asset_id+"-part-"+pi+"\" type=\"text/javascript\">/*<![CDATA[*/ "+asset[pi][0]+" /*]]>*/</script>"
+                                        "<script id=\"importer-inline-script-"+asset_id+"-part-"+pi+"\" "+atts+">/*<![CDATA[*/ "+asset[pi][0]+" /*]]>*/</script>"
                                         );
                                     }
                                     else
                                     {
                                         out.push(
-                                        "<script id=\"importer-script-"+asset_id+"-part-"+pi+"\" type=\"text/javascript\" src=\""+self.path_url(asset[pi])+"\"></script>"
+                                        "<script id=\"importer-script-"+asset_id+"-part-"+pi+"\" src=\""+self.path_url(asset[pi])+"\" "+atts+"></script>"
                                         );
                                     }
                                 }
@@ -1145,25 +1216,30 @@ Importer[PROTO] = {
                             else
                             {
                                 out.push(
-                                "<script id=\"importer-script-"+asset_id+"\" type=\"text/javascript\" src=\""+self.path_url(asset)+"\"></script>"
+                                "<script id=\"importer-script-"+asset_id+"\" src=\""+self.path_url(asset)+"\" "+atts+"></script>"
                                 );
                             }
                         }
                     }
                     else if ( is_tpl )
                     {
+                        atts = merge({
+                            'type'  : 'text/x-tpl'
+                        }, props);
+                        
                         if ( isBrowser )
                         {
                             out.push( document_asset = is_inlined
-                                ? $$("importer-inline-tpl-"+asset_id) || $$asset( 'tpl', asset[0] )
-                                : $$("importer-inline-tpl-"+asset_id) || $$asset( 'tpl', self.get(asset) ) );
+                                ? $$("importer-inline-tpl-"+asset_id) || $$asset( 'tpl', asset[0], false, atts )
+                                : $$("importer-inline-tpl-"+asset_id) || $$asset( 'tpl', self.get(asset), false, atts ) );
                             document_asset[ATTR]('id', is_inlined ? "importer-inline-tpl-"+asset_id : "importer-inline-tpl-"+asset_id);
                         }
                         else
                         {
+                            atts = attributes( atts );
                             out.push( is_inlined
-                                    ? ("<script id=\"importer-inline-tpl-"+asset_id+"\" type=\"text/x-tpl\">"+asset[0]+"</script>")
-                                    : ("<script id=\"importer-inline-tpl-"+asset_id+"\" type=\"text/x-tpl\">"+self.get(asset)+"</script>")
+                                    ? ("<script id=\"importer-inline-tpl-"+asset_id+"\" "+atts+">"+asset[0]+"</script>")
+                                    : ("<script id=\"importer-inline-tpl-"+asset_id+"\" "+atts+">"+self.get(asset)+"</script>")
                             );
                         }
                     }
@@ -1191,7 +1267,7 @@ Importer[PROTO] = {
         {
             if ( !assets[HAS](id) ) continue;
             asset_def = assets[id];
-            if ( (type === asset_def[0] || type_composite === asset_def[0]) && asset_def[4] && !asset_def[5] )
+            if ( (type === asset_def[0] || type_composite === asset_def[0]) && asset_def[5] && !asset_def[6] )
             {
                 to_load.push( asset_def[1] );
             }
@@ -1212,13 +1288,13 @@ Importer[PROTO] = {
         return out;
     }
     
-    ,enqueue: function( type, id, asset, deps ) {
+    ,enqueue: function( type, id, asset, deps, props ) {
         var self = this, assets = self._assets;
         if ( !empty(type) && !empty(id) )
         {
             if ( assets[HAS](id) ) 
             {
-                assets[id][4] = true; // enqueued
+                assets[id][5] = true; // enqueued
                 // hook here
                 self.trigger("enqueue-asset", [
                     // importer, id,      type,   asset
@@ -1230,8 +1306,8 @@ Importer[PROTO] = {
             }
             else if ( !empty(asset) ) 
             {
-                self.register("assets", [type, id, asset, deps]);
-                assets[id][4] = true; // enqueued
+                self.register("assets", [type, id, asset, deps, props]);
+                assets[id][5] = true; // enqueued
                 // hook here
                 self.trigger("enqueue-asset", [
                     // importer, id,      type,   asset

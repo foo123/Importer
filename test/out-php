@@ -1,4 +1,4 @@
-Importer.VERSION = 0.3.4
+Importer.VERSION = 0.3.5
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
 Test1.php
 Test2.php
@@ -49,8 +49,12 @@ Array
                                 (
                                 )
 
-                            [4] => 
+                            [4] => Array
+                                (
+                                )
+
                             [5] => 
+                            [6] => 
                         )
 
                     [asset2] => Array
@@ -63,8 +67,12 @@ Array
                                     [0] => asset1
                                 )
 
-                            [4] => 
+                            [4] => Array
+                                (
+                                )
+
                             [5] => 
+                            [6] => 
                         )
 
                     [asset3] => Array
@@ -82,8 +90,12 @@ Array
                                     [1] => asset2
                                 )
 
-                            [4] => 
+                            [4] => Array
+                                (
+                                )
+
                             [5] => 
+                            [6] => 
                         )
 
                 )
@@ -115,6 +127,6 @@ class Test1
 {
 }
 echo 'Test1.php' . PHP_EOL;
-<link id="importer-style-asset1" type="text/css" rel="stylesheet" href="http://_mygit/Importer/test/assets/asset1.css" media="all" />
-<link id="importer-style-asset2" type="text/css" rel="stylesheet" href="http://_mygit/Importer/test/assets/asset2.css" media="all" />
+<link id="importer-style-asset1" href="http://_mygit/Importer/test/assets/asset1.css" rel="stylesheet" type="text/css" media="all" />
+<link id="importer-style-asset2" href="http://_mygit/Importer/test/assets/asset2.css" rel="stylesheet" type="text/css" media="all" />
 <style id="importer-inline-style-asset3" type="text/css" media="all">/* asset 3 */</style>

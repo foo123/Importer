@@ -3,14 +3,14 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.4
+*  @version 0.3.5
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer') )
 { 
 class Importer
 {
-    const VERSION = '0.3.4';
+    const VERSION = '0.3.5';
     
     const DS = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -86,6 +86,14 @@ class Importer
         }
 
         return ($isAbsolute === $DS ? $DS : "") . self::add_protocol( $path );
+    }
+    
+    public static function attributes( $atts )
+    {
+        if ( empty($atts) ) return '';
+        $out = array();
+        foreach($atts as $k=>$v) $out[] = "{$k}=\"{$v}\"";
+        return implode(' ', $out);
     }
     
     private $base = null;
@@ -248,8 +256,9 @@ class Importer
             {
                 foreach ($defs as $def)
                 {
-                    /* 0:type, 1:id, 2:asset, 3:deps */
+                    /* 0:type, 1:id, 2:asset, 3:deps, 4:extra props */
                     $type = $def[0]; $id = $def[1]; $asset = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
+                    $props = isset($def[4]) ? $def[4] : array();
                     if ( !empty( $type ) && !empty( $id ) && !empty( $asset ) ) 
                     {
                         $type = strtolower($type);
@@ -263,8 +272,8 @@ class Importer
                             $asset = $this->path_url( $asset );
                         }
                         $this->_assets[ $id ] = array(
-                            /* 0:type, 1:id, 2:asset, 3:deps, 4:enqueued, 5:loaded */
-                            $type, $id, $asset, (array)$deps, false, false
+                            /* 0:type, 1:id, 2:asset, 3:deps, 4:props, 5:enqueued, 6:loaded */
+                            $type, $id, $asset, (array)$deps, (array)$props, false, false
                         );
                     }
                 }
@@ -331,13 +340,14 @@ class Importer
         while ( !empty( $queue ) )
         {
             $id = $queue[0];
-            if ( isset( $this->_assets[$id] ) && $this->_assets[$id][4] && !$this->_assets[$id][5] ) // enqueued but not loaded yet
+            if ( isset( $this->_assets[$id] ) && $this->_assets[$id][5] && !$this->_assets[$id][6] ) // enqueued but not loaded yet
             {
                 $asset_def =& $this->_assets[$id];
                 $type = $asset_def[0]; 
                 $id = $asset_def[1];  
                 $asset = $asset_def[2]; 
                 $deps = $asset_def[3];
+                $props = $asset_def[4];
                 if ( !empty( $deps ) )
                 {
                     $needs_deps = false;
@@ -345,9 +355,9 @@ class Importer
                     for ($i=$numdeps-1; $i>=0; $i--)
                     {
                         $dep = $deps[$i];
-                        if ( isset( $this->_assets[$dep] ) && !$this->_assets[$dep][5] )
+                        if ( isset( $this->_assets[$dep] ) && !$this->_assets[$dep][6] )
                         {
-                            $this->_assets[$dep][4] = true; // enqueued
+                            $this->_assets[$dep][5] = true; // enqueued
                             $needs_deps = true;
                             array_unshift( $queue, $dep );
                         }
@@ -355,7 +365,7 @@ class Importer
                     if ( $needs_deps ) continue;
                     else array_shift( $queue );
                 }
-                $asset_def[5] = true; // loaded
+                $asset_def[6] = true; // loaded
                 
                 // hook here
                 $ret = array();
@@ -381,9 +391,14 @@ class Importer
                     $asset_id = preg_replace( '/[\\-.\\/\\\\:]+/', '_', $id);
                     if ( $is_style )
                     {
+                        $attributes = self::attributes(array_merge(array(
+                            'type'  => 'text/css',
+                            'media' => 'all'
+                        ), $props));
+                        
                         if ( $is_inlined )
                         {
-                            $out[] = "<style id=\"importer-inline-style-{$asset_id}\" type=\"text/css\" media=\"all\">{$asset[0]}</style>";
+                            $out[] = "<style id=\"importer-inline-style-{$asset_id}\" {$attributes}>{$asset[0]}</style>";
                         }
                         elseif ( $is_composite )
                         {
@@ -391,24 +406,28 @@ class Importer
                             {
                                 if ( is_array($part) )
                                 {
-                                    $out[] = "<style id=\"importer-inline-style-{$asset_id}-part-{$pi}\" type=\"text/css\" media=\"all\">{$part[0]}</style>";
+                                    $out[] = "<style id=\"importer-inline-style-{$asset_id}-part-{$pi}\" {$attributes}>{$part[0]}</style>";
                                 }
                                 else
                                 {
-                                    $out[] = "<link id=\"importer-style-{$asset_id}-part-{$pi}\" type=\"text/css\" rel=\"stylesheet\" href=\"".$this->path_url($part)."\" media=\"all\" />";
+                                    $out[] = "<link id=\"importer-style-{$asset_id}-part-{$pi}\" href=\"".$this->path_url($part)."\" rel=\"stylesheet\" {$attributes} />";
                                 }
                             }
                         }
                         else
                         {
-                            $out[] = "<link id=\"importer-style-{$asset_id}\" type=\"text/css\" rel=\"stylesheet\" href=\"".$this->path_url($asset)."\" media=\"all\" />";
+                            $out[] = "<link id=\"importer-style-{$asset_id}\" href=\"".$this->path_url($asset)."\" rel=\"stylesheet\" {$attributes} />";
                         }
                     }
                     elseif ( $is_script )
                     {
+                        $attributes = self::attributes(array_merge(array(
+                            'type'  => 'text/javascript'
+                        ), $props));
+                        
                         if ( $is_inlined )
                         {
-                            $out[] = "<script id=\"importer-inline-script-{$asset_id}\" type=\"text/javascript\">/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>";
+                            $out[] = "<script id=\"importer-inline-script-{$asset_id}\" {$attributes}>/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>";
                         }
                         elseif ( $is_composite )
                         {
@@ -416,24 +435,28 @@ class Importer
                             {
                                 if ( is_array($part) )
                                 {
-                                    $out[] = "<script id=\"importer-inline-script-{$asset_id}-part-{$pi}\" type=\"text/javascript\">/*<![CDATA[*/ {$part[0]} /*]]>*/</script>";
+                                    $out[] = "<script id=\"importer-inline-script-{$asset_id}-part-{$pi}\" {$attributes}>/*<![CDATA[*/ {$part[0]} /*]]>*/</script>";
                                 }
                                 else
                                 {
-                                    $out[] = "<script id=\"importer-script-{$asset_id}-part-{$pi}\" type=\"text/javascript\" src=\"".$this->path_url($part)."\"></script>";
+                                    $out[] = "<script id=\"importer-script-{$asset_id}-part-{$pi}\" src=\"".$this->path_url($part)."\" {$attributes}></script>";
                                 }
                             }
                         }
                         else
                         {
-                            $out[] = "<script id=\"importer-script-{$asset_id}\" type=\"text/javascript\" src=\"".$this->path_url($asset)."\"></script>";
+                            $out[] = "<script id=\"importer-script-{$asset_id}\" src=\"".$this->path_url($asset)."\" {$attributes}></script>";
                         }
                     }
                     elseif ( $is_tpl )
                     {
+                        $attributes = self::attributes(array_merge(array(
+                            'type'  => 'text/x-tpl'
+                        ), $props));
+                        
                         $out[] = $is_inlined
-                                ? ("<script id=\"importer-inline-tpl-{$asset_id}\" type=\"text/x-tpl\">{$asset[0]}</script>")
-                                : ("<script id=\"importer-inline-tpl-{$asset_id}\" type=\"text/x-tpl\">".$this->get($asset)."</script>");
+                                ? ("<script id=\"importer-inline-tpl-{$asset_id}\" {$attributes}>{$asset[0]}</script>")
+                                : ("<script id=\"importer-inline-tpl-{$asset_id}\" {$attributes}>".$this->get($asset)."</script>");
                     }
                     else
                     {
@@ -456,19 +479,19 @@ class Importer
         $type_composite = $type . '-composite';
         foreach ($this->_assets as $asset_def)
         {
-            if ( ($type === $asset_def[0] || $type_composite === $asset_def[0]) && $asset_def[4] && !$asset_def[5] )
+            if ( ($type === $asset_def[0] || $type_composite === $asset_def[0]) && $asset_def[5] && !$asset_def[6] )
                 $out = array_merge($out, $this->import_asset($asset_def[1]));
         }
         return implode("\n", $out);
     }
     
-    public function enqueue( $type, $id, $asset=null, $deps=array() )
+    public function enqueue( $type, $id, $asset=null, $deps=array(), $props=array() )
     {
         if ( !empty( $type ) && !empty( $id ) )
         {
             if ( isset( $this->_assets[$id] ) ) 
             {
-                $this->_assets[$id][4] = true; // enqueued
+                $this->_assets[$id][5] = true; // enqueued
                 // hook here
                 $this->trigger("enqueue-asset", array(
                     // $importer, $id,      $type,   $asset
@@ -480,8 +503,8 @@ class Importer
             }
             elseif ( !empty( $asset ) ) 
             {
-                $this->register("assets", array($type, $id, $asset, $deps));
-                $this->_assets[$id][4] = true; // enqueued
+                $this->register("assets", array($type, $id, $asset, $deps, $props));
+                $this->_assets[$id][5] = true; // enqueued
                 // hook here
                 $this->trigger("enqueue-asset", array(
                     // $importer, $id,      $type,   $asset
