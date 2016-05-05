@@ -1,4 +1,4 @@
-Importer.VERSION = 0.3.5
+Importer.VERSION = 0.3.6
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
 Test1.php
 Test2.php
@@ -11,104 +11,128 @@ Array
             [base_url:Importer:private] => http://_mygit/Importer/test/
             [_classes:Importer:private] => Array
                 (
-                    [Test1] => Array
+                    [__global__] => Array
                         (
-                            [0] => Test1
-                            [1] => Test1
-                            [2] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test1.php
-                            [3] => Array
-                                (
-                                )
-
-                            [4] => 1
-                        )
-
-                    [Test2] => Array
-                        (
-                            [0] => Test2
-                            [1] => Test2
-                            [2] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test2.php
-                            [3] => Array
+                            [Test1] => Array
                                 (
                                     [0] => Test1
+                                    [1] => Test1
+                                    [2] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test1.php
+                                    [3] => Array
+                                        (
+                                        )
+
+                                    [4] => 1
                                 )
 
-                            [4] => 1
+                        )
+
+                    [my-ctx] => Array
+                        (
+                            [Test2] => Array
+                                (
+                                    [0] => Test2
+                                    [1] => Test2
+                                    [2] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test2.php
+                                    [3] => Array
+                                        (
+                                            [0] => Test1
+                                        )
+
+                                    [4] => 1
+                                )
+
                         )
 
                 )
 
             [_assets:Importer:private] => Array
                 (
-                    [asset1] => Array
+                    [__global__] => Array
                         (
-                            [0] => styles
-                            [1] => asset1
-                            [2] => http://_mygit/Importer/test/assets/asset1.css
-                            [3] => Array
+                            [asset1] => Array
                                 (
+                                    [0] => styles
+                                    [1] => asset1
+                                    [2] => http://_mygit/Importer/test/assets/asset1.css
+                                    [3] => Array
+                                        (
+                                        )
+
+                                    [4] => Array
+                                        (
+                                        )
+
+                                    [5] => 
+                                    [6] => 
                                 )
 
-                            [4] => Array
+                            [asset2] => Array
                                 (
-                                )
-
-                            [5] => 
-                            [6] => 
-                        )
-
-                    [asset2] => Array
-                        (
-                            [0] => styles
-                            [1] => asset2
-                            [2] => http://_mygit/Importer/test/assets/asset2.css
-                            [3] => Array
-                                (
-                                    [0] => asset1
-                                )
-
-                            [4] => Array
-                                (
-                                )
-
-                            [5] => 
-                            [6] => 
-                        )
-
-                    [asset3] => Array
-                        (
-                            [0] => styles
-                            [1] => asset3
-                            [2] => Array
-                                (
-                                    [0] => /* asset 3 */
-                                )
-
-                            [3] => Array
-                                (
-                                    [0] => asset1
+                                    [0] => styles
                                     [1] => asset2
+                                    [2] => http://_mygit/Importer/test/assets/asset2.css
+                                    [3] => Array
+                                        (
+                                            [0] => asset1
+                                        )
+
+                                    [4] => Array
+                                        (
+                                        )
+
+                                    [5] => 
+                                    [6] => 
                                 )
 
-                            [4] => Array
+                        )
+
+                    [my-ctx] => Array
+                        (
+                            [asset3] => Array
                                 (
+                                    [0] => styles
+                                    [1] => asset3
+                                    [2] => Array
+                                        (
+                                            [0] => /* asset 3 */
+                                        )
+
+                                    [3] => Array
+                                        (
+                                            [0] => asset1
+                                            [1] => asset2
+                                        )
+
+                                    [4] => Array
+                                        (
+                                        )
+
+                                    [5] => 
+                                    [6] => 
                                 )
 
-                            [5] => 
-                            [6] => 
                         )
 
                 )
 
             [_hooks:Importer:private] => Array
                 (
-                    [import-class-Test2] => Array
+                    [__global__] => Array
                         (
-                            [0] => Array
+                        )
+
+                    [my-ctx] => Array
+                        (
+                            [import-class-Test2] => Array
                                 (
-                                    [0] => console_log
-                                    [1] => 
-                                    [2] => 1
+                                    [0] => Array
+                                        (
+                                            [0] => console_log
+                                            [1] => 
+                                            [2] => 1
+                                        )
+
                                 )
 
                         )

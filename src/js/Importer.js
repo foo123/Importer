@@ -2,7 +2,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.5
+*  @version 0.3.6
 *  https://github.com/foo123/Importer
 **/
 !function( root, name, factory ) {
@@ -30,10 +30,10 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
             : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
     NOP = function( ){ },
     
-    isXPCOM = ("undefined" !== typeof Components) && ("object" === typeof Components.classes) && ("object" === typeof Components.classesByID) && Components.utils && ("function" === typeof Components.utils['import']),
-    isNode = !isXPCOM && ("undefined" !== typeof global) && ("[object global]" === toString.call(global)),
-    isWebWorker = !isXPCOM && !isNode && ('undefined' !== typeof WorkerGlobalScope) && ("function" === typeof importScripts) && (navigator instanceof WorkerNavigator),
-    isBrowser = !isXPCOM && !isNode && !isWebWorker && ("undefined" !== typeof navigator),
+    isXPCOM = ('undefined' !== typeof Components) && ('object' === typeof Components.classes) && ('object' === typeof Components.classesByID) && Components.utils && ('function' === typeof Components.utils['import']),
+    isNode = !isXPCOM && ('undefined' !== typeof global) && ('[object global]' === toString.call(global)),
+    isWebWorker = !isXPCOM && !isNode && ('undefined' !== typeof WorkerGlobalScope) && ('function' === typeof importScripts) && (navigator instanceof WorkerNavigator),
+    isBrowser = !isXPCOM && !isNode && !isWebWorker && ('undefined' !== typeof navigator),
     isAMD = ('function' === typeof define) && define.amd && ('function' === typeof require),
     isESModule = !isXPCOM && !isNode && ('undefined' !== typeof System) && ('function' === typeof System.register) && ('function' === typeof System['import']),
     Cu = isXPCOM ? Components.utils : null,
@@ -50,8 +50,8 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 
 if ( isXPCOM )
 {
     // do some necessary imports
-    Cu['import']("resource://gre/modules/NetUtil.jsm");
-    Cu['import']("resource://gre/modules/osfile.jsm");
+    Cu['import']('resource://gre/modules/NetUtil.jsm');
+    Cu['import']('resource://gre/modules/osfile.jsm');
 }
 
 var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
@@ -77,7 +77,7 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         // code for IE7+, Firefox, Chrome, Opera, Safari
         ? new XMLHttpRequest( )
         // code for IE6, IE5
-        : new ActiveXObject("Microsoft.XMLHTTP") // or ActiveXObject("Msxml2.XMLHTTP"); ??
+        : new ActiveXObject('Microsoft.XMLHTTP') // or ActiveXObject("Msxml2.XMLHTTP"); ??
     ;
     },
     
@@ -85,9 +85,9 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
     DS = isXPCOM
     ? (function path_separator( ){
         // http://stackoverflow.com/a/7092596/3591273
-        var profil_dir = Cc["@mozilla.org/file/directory_service;1"].getService(Ci.nsIProperties).get("ProfD",Ci.nsIFile);
-        profil_dir.append("abc"); profil_dir.append("abc");
-        return profil_dir.path.substr(profil_dir.path.length-("abc".length)-1,1);
+        var profil_dir = Cc['@mozilla.org/file/directory_service;1'].getService(Ci.nsIProperties).get('ProfD',Ci.nsIFile);
+        profil_dir.append('abc'); profil_dir.append('abc');
+        return profil_dir.path.substr(profil_dir.path.length-('abc'.length)-1,1);
     })( )
     : (isNode
     ? require('path').sep /* https://nodejs.org/api/path.html#path_path_sep */
@@ -100,7 +100,7 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
             url = ios.newURI(file_uri, null, null), // url is a nsIURI
             // file is a nsIFile    
             file = url.QueryInterface(Ci.nsIFileURL).file;*/
-        return Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService).newURI(file_uri, null, null).QueryInterface(Ci.nsIFileURL).file;
+        return Cc['@mozilla.org/network/io-service;1'].getService(Ci.nsIIOService).newURI(file_uri, null, null).QueryInterface(Ci.nsIFileURL).file;
     },
     
     read_file = isXPCOM
@@ -108,10 +108,10 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         var data, file, stream, len;
         // https://developer.mozilla.org/en-US/Add-ons/Code_snippets/File_I_O
         file = fileurl_2_nsfile( path );
-        stream = Cc["@mozilla.org/network/file-input-stream;1"].createInstance(Ci.nsIFileInputStream);
+        stream = Cc['@mozilla.org/network/file-input-stream;1'].createInstance(Ci.nsIFileInputStream);
         if ( 'binary' === enc )
         {
-            var bstream = Cc["@mozilla.org/binaryinputstream;1"].createInstance(Ci.nsIBinaryInputStream);
+            var bstream = Cc['@mozilla.org/binaryinputstream;1'].createInstance(Ci.nsIBinaryInputStream);
             stream.init(file, -1, -1, false);
             len = stream.available( );
             bstream.setInputStream( stream );
@@ -120,7 +120,7 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         }
         else
         {
-            var cstream = Cc["@mozilla.org/intl/converter-input-stream;1"].createInstance(Ci.nsIConverterInputStream),
+            var cstream = Cc['@mozilla.org/intl/converter-input-stream;1'].createInstance(Ci.nsIConverterInputStream),
                 str = {value:''}, read = 0;
             data = null;
             stream.init(file, -1, 0, 0); cstream.init(stream, enc, 0, 0);
@@ -149,14 +149,14 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         if ( 'binary' === enc )
         {
             // http://stackoverflow.com/questions/9855127/setting-xmlhttprequest-responsetype-forbidden-all-of-a-sudden
-            if ( isWebWorker ) xhr.responseType = "arraybuffer";
+            if ( isWebWorker ) xhr.responseType = 'arraybuffer';
         }
         else
         {
             // http://stackoverflow.com/questions/9855127/setting-xmlhttprequest-responsetype-forbidden-all-of-a-sudden
-            if ( isWebWorker ) xhr.responseType = "text";
-            xhr.setRequestHeader("Content-Type", "text/plain; charset="+enc+"");
-            xhr.overrideMimeType("text/plain; charset="+enc+"");
+            if ( isWebWorker ) xhr.responseType = 'text';
+            xhr.setRequestHeader('Content-Type', 'text/plain; charset='+enc+'');
+            xhr.overrideMimeType('text/plain; charset='+enc+'');
         }
         xhr.send( null );
         if ( 200 === xhr.status )
@@ -173,7 +173,7 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
             {
                 if ( 'binary' === enc )
                 {
-                    var bstream = Cc["@mozilla.org/binaryinputstream;1"].createInstance(Ci.nsIBinaryInputStream),
+                    var bstream = Cc['@mozilla.org/binaryinputstream;1'].createInstance(Ci.nsIBinaryInputStream),
                         len = stream.available( );
                     bstream.setInputStream( stream );
                     bstream.readByteArray( len, data = new Uint8Array( len ) );
@@ -215,16 +215,16 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         xhr.open('GET', path, true);  // 'true' makes the request asynchronous
         if ( 'binary' === enc )
         {
-            xhr.responseType = "arraybuffer";
+            xhr.responseType = 'arraybuffer';
             xhr.onload = function( ) {
                 if ( cb ) cb( 200 === xhr.status ? xhr.response : (null != defval ? defval : null) );
             };
         }
         else
         {
-            xhr.responseType = "text";
-            xhr.setRequestHeader("Content-Type", "text/plain; charset="+enc+"");
-            xhr.overrideMimeType("text/plain; charset="+enc+"");
+            xhr.responseType = 'text';
+            xhr.setRequestHeader('Content-Type', 'text/plain; charset='+enc+'');
+            xhr.overrideMimeType('text/plain; charset='+enc+'');
             xhr.onload = function( ) {
                 if ( cb ) cb( 200 === xhr.status ? xhr.responseText : (null != defval ? defval : '') );
             };
@@ -246,20 +246,20 @@ function load_deps( importer, scope, cache, ref, complete )
     {
         for (i=0; i<dl; i++)
         {
-            if ( cache[HAS](ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[ i ].cache_id ];
-            else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[ i ].cache_id ] = read_file( ref[ i ].path, isXPCOM ? 'UTF-8' : 'utf8' );
+            if ( cache[HAS](ref[i].ctx+'--'+ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[i].ctx+'--'+ref[ i ].cache_id ];
+            else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[i].ctx+'--'+ref[ i ].cache_id ] = read_file( ref[ i ].path, isXPCOM ? 'UTF-8' : 'utf8' );
             else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
             else
             {                
                 loaded[ i ] = import_module( ref[ i ].name, ref[ i ].path, scope ) || null;
                 // hook here
-                importer.trigger("import-class", [
+                importer.trigger('import-class', [
                     //          this,     id,        classname,   path,        reference
                     importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]).trigger("import-class-"+ref[i].id, [
+                ], ref[i].ctx).trigger('import-class-'+ref[i].id, [
                     //          this,     id,        classname,   path,        reference
                     importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]);
+                ], ref[i].ctx);
             }
         }
         return complete.apply( scope, loaded );
@@ -267,9 +267,9 @@ function load_deps( importer, scope, cache, ref, complete )
     // browser, <script> tags
     else
     {
-        head = $$tag("head", 0); 
+        head = $$tag('head', 0); 
         t = 0; i = 0;
-        load = function load( id, type, path, next ) {
+        load = function load( id, ctx, type, path, next ) {
             var done, script;
             if ( 'style' === type || 'script' === type )
             {
@@ -280,8 +280,8 @@ function load_deps( importer, scope, cache, ref, complete )
                 else
                 {
                     read_file_async( path, 'utf8', function(data){
-                        cache[ id ]  = data;
-                        $$asset(type, data)[ATTR]("id", id);
+                        cache[ ctx+'--'+id ]  = data;
+                        $$asset(type, data)[ATTR]('id', id);
                         next( );
                     });
                 }
@@ -295,9 +295,9 @@ function load_deps( importer, scope, cache, ref, complete )
                 else
                 {
                     read_file_async( path, 'utf8', function(data){
-                        cache[ id ]  = data;
+                        cache[ ctx+'--'+id ]  = data;
                         if ( 'template' === type && !$$(id) )
-                            $$asset('tpl', data)[ATTR]("id", id);
+                            $$asset('tpl', data)[ATTR]('id', id);
                         next( );
                     });
                 }
@@ -316,7 +316,7 @@ function load_deps( importer, scope, cache, ref, complete )
                     script[ATTR]('type', 'text/javascript'); 
                     script[ATTR]('language', 'javascript');
                     script.onload = script.onreadystatechange = function( ) {
-                        if (!done && (!script.readyState || script.readyState == 'loaded' || script.readyState == 'complete'))
+                        if (!done && (!script.readyState || 'loaded' == script.readyState  || 'complete' == script.readyState))
                         {
                             done = 1; 
                             script.onload = script.onreadystatechange = null;
@@ -332,32 +332,32 @@ function load_deps( importer, scope, cache, ref, complete )
         };
         next = function next( ) {
             var cached;
-            if ( (cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope) )
+            if ( (cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope) )
             {
-                loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
+                loaded[ i ] = (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
                 
                 // hook here
-                importer.trigger("import-class", [
+                importer.trigger('import-class', [
                     //          this,     id,        classname,   path,        reference
                     importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]).trigger("import-class-"+ref[i].id, [
+                ], ref[ i ].ctx).trigger('import-class-'+ref[i].id, [
                     //          this,     id,        classname,   path,        reference
                     importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ]);
+                ], ref[ i ].ctx);
                 
                 if ( ++i >= dl ) 
                 {
                     complete.apply( scope, loaded );
                 }
-                else if ( (cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope) ) 
+                else if ( (cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope) ) 
                 {
-                    loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
+                    loaded[ i ] = (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
                     next( ); 
                 }
                 else
                 {                    
                     scope[ ref[ i ].name ] = null;
-                    load( ref[ i ].cache_id, ref[ i ].type, ref[ i ].path, next );
+                    load( ref[ i ].cache_id, ref[ i ].ctx, ref[ i ].type, ref[ i ].path, next );
                 }
             }
             else if ( ++t < 4 ) 
@@ -369,29 +369,29 @@ function load_deps( importer, scope, cache, ref, complete )
                 t = 0; 
                 scope[ ref[ i ].name ] = null;
                 // hook here
-                importer.trigger("import-class", [
+                importer.trigger('import-class', [
                     //          this,     id,        classname,   path,        reference
                     importer, ref[i].id, ref[i].name, ref[i].path, null
-                ]).trigger("import-class-"+ref[i].id, [
+                ], ref[ i ].ctx).trigger('import-class-'+ref[i].id, [
                     //          this,     id,        classname,   path,        reference
                     importer, ref[i].id, ref[i].name, ref[i].path, null
-                ]);
+                ], ref[ i ].ctx);
                 i++; next( ); 
             }
         };
-        while ( i < dl && ((cached=cache[HAS](ref[ i ].cache_id)) || (ref[ i ].name in scope)) ) 
+        while ( i < dl && ((cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope)) ) 
         {
-            loaded[ i ] = (cached ? cache[ ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
+            loaded[ i ] = (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
             i++;
         }
-        if ( i < dl ) load( ref[ i ].cache_id, ref[ i ].type, ref[ i ].path, next );
+        if ( i < dl ) load( ref[ i ].cache_id, ref[ i ].ctx, ref[ i ].type, ref[ i ].path, next );
         else complete.apply( scope, loaded );
     }
 }
 
 function is_callable( o )
 {
-    return "function" === typeof o;
+    return 'function' === typeof o;
 }
 function is_string( o )
 {
@@ -457,7 +457,7 @@ function $$css( style, css )
     var css_type = typeof css, n, index, declaration, selector, rules;
     
     // css rules object
-    if ( "object" === css_type )
+    if ( 'object' === css_type )
     {
         index = 0;
         for (n in css)
@@ -466,12 +466,12 @@ function $$css( style, css )
             declaration = css[ n ];
             selector = declaration.selector;
             rules = [].concat(declaration.rules).join('; ');
-            if ( "insertRule" in style.sheet ) 
+            if ( 'insertRule' in style.sheet ) 
             {
-                style.sheet.insertRule( selector + "{" + rules + "}", index );
+                style.sheet.insertRule( selector + '{' + rules + '}', index );
                 declaration.css = style.sheet.cssRules[ index ];
             }
-            else if ( "addRule" in style.sheet ) 
+            else if ( 'addRule' in style.sheet ) 
             {
                 style.sheet.addRule( selector, rules, index );
                 declaration.css = style.sheet.rules[ index ];
@@ -480,7 +480,7 @@ function $$css( style, css )
         }
     }
     // css literal string
-    else if ( "string" === css_type )
+    else if ( 'string' === css_type )
     {
         if ( style.styleSheet ) style.styleSheet.cssText = (style.styleSheet.cssText||'') + css;
         else style.appendChild( document.createTextNode( css ) );
@@ -494,18 +494,18 @@ function $$asset( type, src, unique, atts )
     switch( type )
     {
         // external tpl
-        case "tpl-link":
+        case 'tpl-link':
         // literal tpl
-        case "tpl":
+        case 'tpl':
             // Create the <script> tag
-            asset = $$el("script");
+            asset = $$el('script');
             if ( atts )
             {
                 attributes( atts, asset );
             }
             else
             {
-                asset[ATTR]("type", "text/x-tpl");
+                asset[ATTR]('type', 'text/x-tpl');
             }
             // WebKit hack :(
             asset.appendChild( document.createTextNode(src) );
@@ -514,11 +514,11 @@ function $$asset( type, src, unique, atts )
             break;
             
         // external script
-        case "script-link":
+        case 'script-link':
             if ( unique )
             {
                 // external script, only if not exists
-                links = $$tag("script");
+                links = $$tag('script');
                 for (i=links.length-1; i>=0; i--) 
                 {
                     if ( links[i].src && src === links[i].src ) 
@@ -544,27 +544,27 @@ function $$asset( type, src, unique, atts )
                 }
                 else
                 {
-                    asset[ATTR]("type", "text/javascript");
-                    asset[ATTR]("language", "javascript");
+                    asset[ATTR]('type', 'text/javascript');
+                    asset[ATTR]('language', 'javascript');
                 }
-                asset[ATTR]("src", src);
+                asset[ATTR]('src', src);
                 // Add the <script> element to the page
                 document.head.appendChild( asset );
             }
             break;
         
         // literal script
-        case "script":
+        case 'script':
             // Create the <script> tag
-            asset = $$el("script");
+            asset = $$el('script');
             if ( atts )
             {
                 attributes( atts, asset );
             }
             else
             {
-                asset[ATTR]("type", "text/javascript");
-                asset[ATTR]("language", "javascript");
+                asset[ATTR]('type', 'text/javascript');
+                asset[ATTR]('language', 'javascript');
             }
             // WebKit hack :(
             asset.appendChild( document.createTextNode(src) );
@@ -573,11 +573,11 @@ function $$asset( type, src, unique, atts )
             break;
             
         // external stylesheet
-        case "style-link":
+        case 'style-link':
             if ( unique )
             {
                 // external stylesheet, only if not exists
-                links = $$tag("link");
+                links = $$tag('link');
                 for (i=links.length-1; i>=0; i--) 
                 {
                     if ( src === links[i].href ) 
@@ -597,7 +597,7 @@ function $$asset( type, src, unique, atts )
             {
                 // Create the <link> tag
                 asset = $$el('link');
-                asset[ATTR]("rel", "stylesheet");
+                asset[ATTR]('rel', 'stylesheet');
                 if ( atts )
                 {
                     attributes( atts, asset );
@@ -605,20 +605,20 @@ function $$asset( type, src, unique, atts )
                 else
                 {
                     // Add a media (and/or media query) here if you'd like!
-                    asset[ATTR]("type", "text/css");
-                    asset[ATTR]("media", "all");
+                    asset[ATTR]('type', 'text/css');
+                    asset[ATTR]('media', 'all');
                 }
-                asset[ATTR]("href", src);
+                asset[ATTR]('href', src);
                 // Add the <style> element to the page
                 document.head.appendChild( asset );
             }
             break;
         
         // literal stylesheet
-        case "style":
+        case 'style':
         default:
             // Create the <style> tag
-            asset = $$el("style");
+            asset = $$el('style');
             if ( atts )
             {
                 attributes( atts, asset );
@@ -626,11 +626,11 @@ function $$asset( type, src, unique, atts )
             else
             {
                 // Add a media (and/or media query) here if you'd like!
-                asset[ATTR]("type", "text/css");
-                asset[ATTR]("media", "all");
+                asset[ATTR]('type', 'text/css');
+                asset[ATTR]('media', 'all');
             }
             // WebKit hack :(
-            asset.appendChild( document.createTextNode("") );
+            asset.appendChild( document.createTextNode('') );
             // Add the <style> element to the page
             document.head.appendChild( asset );
             if ( src ) $$css( asset, src );
@@ -682,16 +682,17 @@ function path_join( )
 // adapted from https://github.com/JosephMoniz/php-path
 function join_path( ) 
 {
-    var args = arguments, argslen = args.length, ds = DS, path, plen,
+    var args = arguments, argslen = args.length,
+        ds = DS, path, plen,
         isAbsolute, trailingSlash, peices, new_path, up, i, last;
     
-    if ( !argslen )  return ".";
+    if ( !argslen )  return '.';
     
     // take care of protocol, if exists
     path = map.call( args, remove_protocol ).join( ds );
     plen = path.length;
     
-    if ( !plen ) return ".";
+    if ( !plen ) return '.';
     
     isAbsolute    = path.charAt( 0 );
     trailingSlash = path.charAt( plen - 1 );
@@ -704,11 +705,11 @@ function join_path( )
     while ( i >= 0 )
     {
         last = peices[ i ];
-        if ( ".." === last ) 
+        if ( '..' === last ) 
         {
             up++;
         } 
-        else if ( "." !== last )
+        else if ( '.' !== last )
         {
             if ( up )  up--;
             else  new_path.push( peices[ i ] );
@@ -720,7 +721,7 @@ function join_path( )
     
     if ( !path && !isAbsolute ) 
     {
-        path = ".";
+        path = '.';
     }
 
     if ( path && trailingSlash === ds ) 
@@ -728,7 +729,16 @@ function join_path( )
         path += ds;
     }
 
-    return (isAbsolute === ds ? ds : "") + add_protocol( path );
+    return (isAbsolute === ds ? ds : '') + add_protocol( path );
+}
+
+function join_path_url( )
+{
+    var _DS = DS, ret;
+    DS = '/';
+    ret = join_path.apply( null, arguments );
+    DS = _DS;
+    return ret;
 }
 
 Importer = function Importer( base, base_url ) {
@@ -737,16 +747,17 @@ Importer = function Importer( base, base_url ) {
     self.base = '';
     self.base_url = '';
     self.base_path( base, base_url );
-    self._classes = { };
-    self._assets = { };
-    self._hooks = { };
+    self._classes = { '__global__':{} };
+    self._assets = { '__global__':{} };
+    self._hooks = { '__global__':{} };
     self._cache = { };
 };
 
-Importer.VERSION = '0.3.5';
+Importer.VERSION = '0.3.6';
 Importer.BASE = './';
 Importer.path_join = path_join;
 Importer.join_path = join_path;
+Importer.join_path_url = join_path_url;
 Importer.attributes = attributes;
 
 Importer[PROTO] = {
@@ -770,31 +781,34 @@ Importer[PROTO] = {
         return self;
     }
     
-    ,on: function( hook, handler, once ) {
+    ,on: function( hook, handler, ctx, once ) {
         var self = this;
-        if ( !empty(hook) && is_callable(handler) )
+        if ( null == ctx ) ctx = '__global__';
+        if ( ctx && !empty(hook) && is_callable(handler) )
         {
-            if ( !self._hooks[HAS](hook) ) self._hooks[hook] = [];
-            self._hooks[hook].push( [handler, true === once, 0] );
+            if ( !self._hooks[HAS](ctx) ) self._hooks[ctx] = {};
+            if ( !self._hooks[ctx][HAS](hook) ) self._hooks[ctx][hook] = [];
+            self._hooks[ctx][hook].push( [handler, true === once, 0] );
         }
         return self;
     }
     
-    ,one: function( hook, handler ) {
-        return this.on( hook, handler, true );
+    ,one: function( hook, handler, ctx ) {
+        return this.on( hook, handler, ctx, true );
     }
     
-    ,off: function( hook, handler ) {
+    ,off: function( hook, handler, ctx ) {
         var self = this, hooks, i;
-        if ( !empty(hook) && !empty(self._hooks[hook]) )
+        if ( null == ctx ) ctx = '__global__';
+        if ( ctx && self._hooks[HAS](ctx) && !empty(hook) && !empty(self._hooks[ctx][hook]) )
         {
             if ( true === handler )
             {
-                delete(self._hooks[hook]);
+                delete(self._hooks[ctx][hook]);
             }
             else if ( handler )
             {
-                hooks = self._hooks[hook];
+                hooks = self._hooks[ctx][hook];
                 for(i=hooks.length-1; i>=0; i--)
                 {
                     if ( handler === hooks[i][0] )
@@ -805,11 +819,12 @@ Importer[PROTO] = {
         return self;
     }
     
-    ,trigger: function( hook, args ) {
+    ,trigger: function( hook, args, ctx ) {
         var self = this, hooks, i, h, ret;
-        if ( !empty(hook) && !empty(self._hooks[hook]) )
+        if ( null == ctx ) ctx = '__global__';
+        if ( ctx && self._hooks[HAS](ctx) && !empty(hook) && !empty(self._hooks[ctx][hook]) )
         {
-            hooks = self._hooks[hook];
+            hooks = self._hooks[ctx][hook];
             args = args || [];
             for(i=0; i<hooks.length; i++)
             {
@@ -841,7 +856,7 @@ Importer[PROTO] = {
         return self;
     }
     
-    ,get_path: function( path, base ) {
+    ,get_path: function( path, base, url ) {
         var self = this;
         
         if ( empty(path) ) return base||'';
@@ -851,8 +866,8 @@ Importer[PROTO] = {
                 startsWith(path, '../') || 
                 startsWith(path, '.\\') || 
                 startsWith(path, '..\\'))
-        ) 
-            return join_path( base, path ); 
+        )
+            return true === url ? join_path_url( base, path ) : join_path( base, path );
         
         else return path;
     }
@@ -864,13 +879,14 @@ Importer[PROTO] = {
     
     ,path_url: function( asset ) {
         var self = this;
-        return self.get_path( asset||'', self.base_url );
+        return self.get_path( asset||'', self.base_url, true );
     }
     
-    ,register: function( what, defs ) {
+    ,register: function( what, defs, ctx ) {
         var self = this, classes = self._classes, assets = self._assets,
             i, l, classname, def, id, path, deps, props, type, asset;
-        if ( is_array( defs ) && defs.length )
+        if ( null == ctx ) ctx = '__global__';
+        if ( ctx && is_array( defs ) && defs.length )
         {
             if ( !is_array( defs[0] ) ) defs = [defs]; // make array of arrays
             
@@ -883,7 +899,8 @@ Importer[PROTO] = {
                     classname = def[0]; id = def[1]; path = def[2]; deps = def[3] ? def[3] : [];
                     if ( !empty( classname ) && !empty( id ) && !empty( path ) ) 
                     {
-                        classes[ id ] = [
+                        if ( !classes[HAS](ctx) ) classes[ctx] = {};
+                        classes[ctx][ id ] = [
                             /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
                             classname, 
                             id, 
@@ -914,7 +931,8 @@ Importer[PROTO] = {
                         {
                             asset = self.path_url( asset );
                         }
-                        assets[ id ] = [
+                        if ( !assets[HAS](ctx) ) assets[ctx] = {};
+                        assets[ctx][ id ] = [
                             /* 0:type, 1:id, 2:asset, 3:deps, 4:props, 5:enqueued, 6:loaded */
                             type, id, asset, array(deps), props, false, false
                         ];
@@ -925,15 +943,16 @@ Importer[PROTO] = {
         return self;
     }
     
-    ,import_class: function( id, complete ) {
+    ,import_class: function( id, complete, ctx ) {
         var self = this, queue, classes = self._classes,
             cache_id = 'class-'+id, cache = self._cache, exists,
-            needs_deps, numdeps, i, dep, deps, to_load;
+            needs_deps, numdeps, i, dep, deps, to_load, ctx2, ctx3;
         
-        if ( cache[HAS](cache_id) ) 
+        if ( null == ctx ) ctx = '__global__';
+        if ( cache[HAS](ctx+'--'+cache_id) ) 
         {
             if ( is_callable(complete) )
-                complete.call( self, cache[cache_id] );
+                complete.call( self, cache[ctx+'--'+cache_id] );
         }
         else
         {
@@ -943,13 +962,13 @@ Importer[PROTO] = {
             while ( queue.length )
             {
                 id = queue[ 0 ];
-                
-                if ( classes[HAS](id) && !classes[id][4] )
+                ctx2 = classes[HAS](ctx) && classes[ctx][HAS](id) ? ctx : '__global__';
+                if ( classes[ctx2][HAS](id) && !classes[ctx2][id][4] )
                 {
                     exists = true;
-                    if ( !Scope[HAS]( classes[id][0] ) )
+                    if ( !Scope[HAS]( classes[ctx2][id][0] ) )
                     {
-                        deps = classes[id][3];
+                        deps = classes[ctx2][id][3];
                         if ( !empty(deps) )
                         {
                             needs_deps = false;
@@ -957,7 +976,8 @@ Importer[PROTO] = {
                             for (i=numdeps-1; i>=0; i--)
                             {
                                 dep = deps[i];
-                                if ( classes[HAS](dep) && !classes[dep][4] )
+                                ctx3 = classes[HAS](ctx) && classes[ctx][HAS](dep) ? ctx : '__global__';
+                                if ( classes[ctx3][HAS](dep) && !classes[ctx3][dep][4] )
                                 {
                                     needs_deps = true;
                                     queue.unshift( dep );
@@ -966,22 +986,23 @@ Importer[PROTO] = {
                             if ( needs_deps ) continue;
                             else queue.shift( );
                         }
-                        classes[id][4] = true; // loaded
+                        classes[ctx2][id][4] = true; // loaded
                         to_load.push({
                             id: id,
                             type: 'class',
                             cache_id: 'class-' + id,
-                            name: classes[id][0],
-                            path: classes[id][2]
+                            name: classes[ctx2][id][0],
+                            path: classes[ctx2][id][2],
+                            ctx: ctx
                         });
                     }
                     else
                     {
-                        classes[id][4] = true; // loaded
-                        cache[ 'class-' + id ] = Scope[ classes[id][0] ];
+                        classes[ctx2][id][4] = true; // loaded
+                        cache[ ctx+'--class-' + id ] = Scope[ classes[ctx2][id][0] ];
                     }
                 }
-                else if ( classes[HAS](id) )
+                else if ( classes[ctx2][HAS](id) )
                 {
                     exists = true;
                     queue.shift( );
@@ -995,8 +1016,8 @@ Importer[PROTO] = {
             {
                 load_deps(self, Scope, cache, to_load, function( ){
                     var i, l, args = arguments;
-                    for (i=0,l=args.length; i<l; i++) cache[ to_load[ i ].cache_id ] = args[ i ];
-                    if ( is_callable(complete) ) complete.call( self, cache[cache_id] );
+                    for (i=0,l=args.length; i<l; i++) cache[ ctx+'--'+to_load[ i ].cache_id ] = args[ i ];
+                    if ( is_callable(complete) ) complete.call( self, cache[ctx+'--'+cache_id] );
                 });
             }
             else if ( is_callable(complete) )
@@ -1007,16 +1028,18 @@ Importer[PROTO] = {
         return self;
     }
     
-    ,import_asset: function( id ) {
+    ,import_asset: function( id, ctx ) {
         var self = this, queue = [ id ], assets = self._assets, deps, props, atts,
             needs_deps, numdeps, i, dep, out = [ ], asset_def, type, asset, asset_id,
-            is_style, is_script, is_tpl, is_composite, is_inlined, pi, pl, document_asset, ret;
+            is_style, is_script, is_tpl, is_composite, is_inlined, pi, pl, document_asset, ret, ctx2, ctx3;
+        if ( null == ctx ) ctx = '__global__';
         while ( queue.length )
         {
             id = queue[ 0 ];
-            if ( assets[HAS](id) && assets[id][5] && !assets[id][6] ) // enqueued but not loaded yet
+            ctx2 = assets[HAS](ctx) && assets[ctx][HAS](id) ? ctx : '__global__';
+            if ( assets[ctx2][HAS](id) && assets[ctx2][id][5] && !assets[ctx2][id][6] ) // enqueued but not loaded yet
             {
-                asset_def = assets[id];
+                asset_def = assets[ctx2][id];
                 type = asset_def[0]; 
                 id = asset_def[1];  
                 asset = asset_def[2]; 
@@ -1029,9 +1052,10 @@ Importer[PROTO] = {
                     for (i=numdeps-1; i>=0; i--)
                     {
                         dep = deps[i];
-                        if ( assets[HAS](dep) && !assets[dep][6] )
+                        ctx3 = assets[HAS](ctx) && assets[ctx][HAS](dep) ? ctx : '__global__';
+                        if ( assets[ctx3][HAS](dep) && !assets[ctx3][dep][6] )
                         {
-                            assets[dep][5] = true; // enqueued
+                            assets[ctx3][dep][5] = true; // enqueued
                             needs_deps = true;
                             queue.unshift( dep );
                         }
@@ -1044,13 +1068,13 @@ Importer[PROTO] = {
                 
                 // hook here
                 ret = {};
-                self.trigger("import-asset", [
+                self.trigger('import-asset', [
                     // importer, id,      type,   asset
                     self, id, type, asset, ret
-                ]).trigger("import-asset-"+id, [
+                ], ctx).trigger('import-asset-'+id, [
                     // importer, id,      type,   asset
                     self, id, type, asset, ret
-                ]);
+                ], ctx);
                 
                 if ( null != ret['return'] )
                 {
@@ -1076,9 +1100,9 @@ Importer[PROTO] = {
                             if ( is_inlined )
                             {
                                 out.push(
-                                document_asset = $$("importer-inline-style-"+asset_id) || $$asset( 'style', asset[0], false, atts )
+                                document_asset = $$('importer-inline-style-'+asset_id) || $$asset( 'style', asset[0], false, atts )
                                 );
-                                document_asset[ATTR]('id', "importer-inline-style-"+asset_id);
+                                document_asset[ATTR]('id', 'importer-inline-style-'+asset_id);
                             }
                             else if ( is_composite )
                             {
@@ -1087,25 +1111,25 @@ Importer[PROTO] = {
                                     if ( is_array(asset[pi]) )
                                     {
                                         out.push(
-                                        document_asset = $$("importer-inline-style-"+asset_id+"-part-"+pi) || $$asset( 'style', asset[pi][0], false, atts )
+                                        document_asset = $$('importer-inline-style-'+asset_id+'-part-'+pi) || $$asset( 'style', asset[pi][0], false, atts )
                                         );
-                                        document_asset[ATTR]('id', "importer-inline-style-"+asset_id+"-part-"+pi);
+                                        document_asset[ATTR]('id', 'importer-inline-style-'+asset_id+'-part-'+pi);
                                     }
                                     else
                                     {
                                         out.push(
-                                        document_asset = $$("importer-style-"+asset_id+"-part-"+pi) || $$asset( 'style-link', self.path_url(asset[pi]), true, atts )
+                                        document_asset = $$('importer-style-'+asset_id+'-part-'+pi) || $$asset( 'style-link', self.path_url(asset[pi]), true, atts )
                                         );
-                                        document_asset[ATTR]('id', "importer-style-"+asset_id+"-part-"+pi);
+                                        document_asset[ATTR]('id', 'importer-style-'+asset_id+'-part-'+pi);
                                     }
                                 }
                             }
                             else
                             {
                                 out.push(
-                                document_asset = $$("importer-style-"+asset_id) || $$asset( 'style-link', self.path_url(asset), true, atts )
+                                document_asset = $$('importer-style-'+asset_id) || $$asset( 'style-link', self.path_url(asset), true, atts )
                                 );
-                                document_asset[ATTR]('id', "importer-style-"+asset_id);
+                                document_asset[ATTR]('id', 'importer-style-'+asset_id);
                             }
                         }
                         else
@@ -1114,7 +1138,7 @@ Importer[PROTO] = {
                             if ( is_inlined )
                             {
                                 out.push(
-                                "<style id=\"importer-inline-style-"+asset_id+"\" "+atts+">"+asset[0]+"</style>"
+                                '<style id="importer-inline-style-'+asset_id+'" '+atts+'>'+asset[0]+'</style>'
                                 );
                             }
                             else if ( is_composite )
@@ -1124,13 +1148,13 @@ Importer[PROTO] = {
                                     if ( is_array(asset[pi]) )
                                     {
                                         out.push(
-                                        "<style id=\"importer-inline-style-"+asset_id+"-part-"+pi+"\" "+atts+">"+asset[pi][0]+"</style>"
+                                        '<style id="importer-inline-style-'+asset_id+'-part-'+pi+'" '+atts+'>'+asset[pi][0]+'</style>'
                                         );
                                     }
                                     else
                                     {
                                         out.push(
-                                        "<link id=\"importer-style-"+asset_id+"-part-"+pi+"\" href=\""+self.path_url(asset[pi])+"\" rel=\"stylesheet\" "+atts+" />"
+                                        '<link id="importer-style-'+asset_id+'-part-'+pi+'" href="'+self.path_url(asset[pi])+'" rel="stylesheet" '+atts+' />'
                                         );
                                     }
                                 }
@@ -1138,7 +1162,7 @@ Importer[PROTO] = {
                             else
                             {
                                 out.push(
-                                "<link id=\"importer-style-"+asset_id+"\" href=\""+self.path_url(asset)+"\" rel=\"stylesheet\" "+atts+" />"
+                                '<link id="importer-style-'+asset_id+'" href="'+self.path_url(asset)+'" rel="stylesheet" '+atts+' />'
                                 );
                             }
                         }
@@ -1154,9 +1178,9 @@ Importer[PROTO] = {
                             if ( is_inlined )
                             {
                                 out.push(
-                                document_asset = $$("importer-inline-script-"+asset_id) || $$asset( 'script', "/*<![CDATA[*/ "+asset[0]+" /*]]>*/", false, atts )
+                                document_asset = $$('importer-inline-script-'+asset_id) || $$asset( 'script', '/*<![CDATA[*/ '+asset[0]+' /*]]>*/', false, atts )
                                 );
-                                document_asset[ATTR]('id', "importer-inline-script-"+asset_id);
+                                document_asset[ATTR]('id', 'importer-inline-script-'+asset_id);
                             }
                             else if ( is_composite )
                             {
@@ -1165,25 +1189,25 @@ Importer[PROTO] = {
                                     if ( is_array(asset[pi]) )
                                     {
                                         out.push(
-                                        document_asset = $$("importer-inline-script-"+asset_id+"-part-"+pi) || $$asset( 'script', "/*<![CDATA[*/ "+asset[pi][0]+" /*]]>*/", false, atts )
+                                        document_asset = $$('importer-inline-script-'+asset_id+'-part-'+pi) || $$asset( 'script', '/*<![CDATA[*/ '+asset[pi][0]+' /*]]>*/', false, atts )
                                         );
-                                        document_asset[ATTR]('id', "importer-inline-script-"+asset_id+"-part-"+pi);
+                                        document_asset[ATTR]('id', 'importer-inline-script-'+asset_id+'-part-'+pi);
                                     }
                                     else
                                     {
                                         out.push(
-                                        document_asset = $$("importer-script-"+asset_id+"-part-"+pi) || $$asset( 'script-link', self.path_url(asset[pi]), true, atts )
+                                        document_asset = $$('importer-script-'+asset_id+'-part-'+pi) || $$asset( 'script-link', self.path_url(asset[pi]), true, atts )
                                         );
-                                        document_asset[ATTR]('id', "importer-script-"+asset_id+"-part-"+pi);
+                                        document_asset[ATTR]('id', 'importer-script-'+asset_id+'-part-'+pi);
                                     }
                                 }
                             }
                             else
                             {
                                 out.push(
-                                document_asset = $$("importer-script-"+asset_id) || $$asset( 'script-link', self.path_url(asset), true, atts )
+                                document_asset = $$('importer-script-'+asset_id) || $$asset( 'script-link', self.path_url(asset), true, atts )
                                 );
-                                document_asset[ATTR]('id', "importer-script-"+asset_id);
+                                document_asset[ATTR]('id', 'importer-script-'+asset_id);
                             }
                         }
                         else
@@ -1192,7 +1216,7 @@ Importer[PROTO] = {
                             if ( is_inlined )
                             {
                                 out.push(
-                                "<script id=\"importer-inline-script-"+asset_id+"\" "+atts+">/*<![CDATA[*/ "+asset[0]+" /*]]>*/</script>"
+                                '<script id="importer-inline-script-'+asset_id+'" '+atts+'>/*<![CDATA[*/ '+asset[0]+' /*]]>*/</script>'
                                 );
                             }
                             else if ( is_composite )
@@ -1202,13 +1226,13 @@ Importer[PROTO] = {
                                     if ( is_array(asset[pi]) )
                                     {
                                         out.push(
-                                        "<script id=\"importer-inline-script-"+asset_id+"-part-"+pi+"\" "+atts+">/*<![CDATA[*/ "+asset[pi][0]+" /*]]>*/</script>"
+                                        '<script id="importer-inline-script-'+asset_id+'-part-'+pi+'" '+atts+'>/*<![CDATA[*/ '+asset[pi][0]+' /*]]>*/</script>'
                                         );
                                     }
                                     else
                                     {
                                         out.push(
-                                        "<script id=\"importer-script-"+asset_id+"-part-"+pi+"\" src=\""+self.path_url(asset[pi])+"\" "+atts+"></script>"
+                                        '<script id="importer-script-'+asset_id+'-part-'+pi+'" src="'+self.path_url(asset[pi])+'" '+atts+'></script>'
                                         );
                                     }
                                 }
@@ -1216,7 +1240,7 @@ Importer[PROTO] = {
                             else
                             {
                                 out.push(
-                                "<script id=\"importer-script-"+asset_id+"\" src=\""+self.path_url(asset)+"\" "+atts+"></script>"
+                                '<script id="importer-script-'+asset_id+'" src="'+self.path_url(asset)+'" '+atts+'></script>'
                                 );
                             }
                         }
@@ -1230,16 +1254,16 @@ Importer[PROTO] = {
                         if ( isBrowser )
                         {
                             out.push( document_asset = is_inlined
-                                ? $$("importer-inline-tpl-"+asset_id) || $$asset( 'tpl', asset[0], false, atts )
-                                : $$("importer-inline-tpl-"+asset_id) || $$asset( 'tpl', self.get(asset), false, atts ) );
-                            document_asset[ATTR]('id', is_inlined ? "importer-inline-tpl-"+asset_id : "importer-inline-tpl-"+asset_id);
+                                ? $$('importer-inline-tpl-'+asset_id) || $$asset( 'tpl', asset[0], false, atts )
+                                : $$('importer-inline-tpl-'+asset_id) || $$asset( 'tpl', self.get(asset), false, atts ) );
+                            document_asset[ATTR]('id', is_inlined ? 'importer-inline-tpl-'+asset_id : 'importer-inline-tpl-'+asset_id);
                         }
                         else
                         {
                             atts = attributes( atts );
                             out.push( is_inlined
-                                    ? ("<script id=\"importer-inline-tpl-"+asset_id+"\" "+atts+">"+asset[0]+"</script>")
-                                    : ("<script id=\"importer-inline-tpl-"+asset_id+"\" "+atts+">"+self.get(asset)+"</script>")
+                                    ? ('<script id="importer-inline-tpl-'+asset_id+'" '+atts+'>'+asset[0]+'</script>')
+                                    : ('<script id="importer-inline-tpl-'+asset_id+'" '+atts+'>'+self.get(asset)+'</script>')
                             );
                         }
                     }
@@ -1257,16 +1281,18 @@ Importer[PROTO] = {
         return out;
     }
     
-    ,assets: function( type ) {
+    ,assets: function( type, ctx ) {
         var self = this, out, assets = self._assets, next,
             id, asset_def, i, l, to_load = [ ], type_composite;
-        if ( !arguments.length ) type = "scripts";
+        if ( !arguments.length ) {type = 'scripts'; ctx='__global__';}
+        if ( null == ctx ) ctx = '__global__';
+        if ( !ctx || !assets[HAS](ctx) ) return '';
         type = type[LOWER]( );
         type_composite = type + '-composite';
-        for (id in assets)
+        for (id in assets[ctx])
         {
-            if ( !assets[HAS](id) ) continue;
-            asset_def = assets[id];
+            if ( !assets[ctx][HAS](id) ) continue;
+            asset_def = assets[ctx][id];
             if ( (type === asset_def[0] || type_composite === asset_def[0]) && asset_def[5] && !asset_def[6] )
             {
                 to_load.push( asset_def[1] );
@@ -1275,47 +1301,48 @@ Importer[PROTO] = {
         if ( isBrowser )
         {
             for (i=0,l=to_load.length; i<l; i++)
-                self.import_asset( to_load[i] );
+                self.import_asset( to_load[i], ctx );
             out = '';
         }
         else //if ( isXPCOM || isNode || isWebWorker )
         {
             out = [ ];
             for (i=0,l=to_load.length; i<l; i++)
-                out = out.concat( self.import_asset( to_load[i] ) );
+                out = out.concat( self.import_asset( to_load[i], ctx ) );
             out = out.join("\n");
         }
         return out;
     }
     
-    ,enqueue: function( type, id, asset, deps, props ) {
+    ,enqueue: function( type, id, ctx, asset, deps, props ) {
         var self = this, assets = self._assets;
-        if ( !empty(type) && !empty(id) )
+        if ( null == ctx ) ctx = '__global__';
+        if ( ctx && !empty(type) && !empty(id) )
         {
-            if ( assets[HAS](id) ) 
+            if ( assets[HAS](ctx) && assets[ctx][HAS](id) ) 
             {
-                assets[id][5] = true; // enqueued
+                assets[ctx][id][5] = true; // enqueued
                 // hook here
-                self.trigger("enqueue-asset", [
+                self.trigger('enqueue-asset', [
                     // importer, id,      type,   asset
-                    self, id, type, assets[id][2]
-                ]).trigger("enqueue-asset-"+id, [
+                    self, id, type, assets[ctx][id][2]
+                ], ctx).trigger('enqueue-asset-'+id, [
                     // importer, id,      type,   asset
-                    self, id, type, assets[id][2]
-                ]);
+                    self, id, type, assets[ctx][id][2]
+                ], ctx);
             }
             else if ( !empty(asset) ) 
             {
-                self.register("assets", [type, id, asset, deps, props]);
-                assets[id][5] = true; // enqueued
+                self.register('assets', [type, id, asset, deps, props], ctx);
+                assets[ctx][id][5] = true; // enqueued
                 // hook here
-                self.trigger("enqueue-asset", [
+                self.trigger('enqueue-asset', [
                     // importer, id,      type,   asset
-                    self, id, type, assets[id][2]
-                ]).trigger("enqueue-asset-"+id, [
+                    self, id, type, assets[ctx][id][2]
+                ], ctx).trigger('enqueue-asset-'+id, [
                     // importer, id,      type,   asset
-                    self, id, type, assets[id][2]
-                ]);
+                    self, id, type, assets[ctx][id][2]
+                ], ctx);
             }
         }
         return self;
@@ -1344,8 +1371,9 @@ Importer[PROTO] = {
         }
     }
     
-    ,load: function( classname, path, deps, complete ) {
-        var self = this, argslen = arguments.length, l, c, i, loader;
+    ,load: function( classname, ctx, path, deps, complete ) {
+        var self = this, argslen = arguments.length, l, c, i, loader, ctx2;
+        if ( null == ctx ) ctx = '__global__';
         if ( is_array(classname) )
         {
             complete = path;
@@ -1356,7 +1384,7 @@ Importer[PROTO] = {
                     c[ i ] = loaded || null;
                     i++;
                 }
-                if ( i < l ) self.import_class( classname[i], loader );
+                if ( i < l ) self.import_class( classname[i],  loader, ctx );
                 else if ( is_callable(complete) )
                 {
                     setTimeout(function( ){
@@ -1368,23 +1396,30 @@ Importer[PROTO] = {
         }
         else
         {
-            if ( argslen < 4 && is_callable(deps) ) 
+            /*if ( argslen < 5 ) 
             {
+                ctx = '__global__';
+            }*/
+            if ( argslen < 5 && is_callable(deps) ) 
+            {
+                //ctx = '__global__';
                 complete = deps;
                 deps = null;
             }
-            else if ( argslen < 3 && is_callable(path) ) 
+            else if ( argslen < 4 && is_callable(path) ) 
             {
+                //ctx = '__global__';
                 complete = path;
                 path = null;
                 deps = null;
             }
-            if ( !self._classes[HAS](classname) && !empty(path) )
-                self.register("classes", [classname, classname, self.path(path), deps]);
-            if ( self._classes[HAS](classname) && !self._classes[classname][4] )
-                self.import_class( classname, complete );
+            if ( (!self._classes[HAS](ctx) || !self._classes[ctx][HAS](classname)) && !self._classes['__global__'][HAS](classname) && !empty(path) )
+                self.register('classes', [classname, classname, self.path(path), deps], ctx);
+            ctx2 = self._classes[HAS](ctx) && self._classes[ctx][HAS](classname) ? ctx : '__global__';
+            if ( self._classes[ctx2][HAS](classname) && !self._classes[ctx2][classname][4] )
+                self.import_class( classname, complete, ctx2 );
             else if ( is_callable(complete) )
-                complete.call( self, self._cache['class-'+classname]||null );
+                complete.call( self, self._cache[ctx2+'--class-'+classname]||null );
         }
         return self;
     }

@@ -1,5 +1,5 @@
 <?php
-require( "../src/php/Importer.php" );
+require( '../src/php/Importer.php' );
 
 echo('Importer.VERSION = ' . Importer::VERSION . PHP_EOL);
 
@@ -13,25 +13,33 @@ function console_log()
 }
 
 $importer = Importer::_( dirname(__FILE__), 'http://_mygit/Importer/test/' )
-    ->register("classes", array(
+    ->register('classes', array(
 
      array('Test1',             'Test1',             './classes/Test1.php')
-    ,array('Test2',             'Test2',             './classes/Test2.php', array('Test1'))
 
-    ))
-    ->register("assets", array(
+    )/*global ctx*/)
+    ->register('classes', array(
+
+    array('Test2',             'Test2',             './classes/Test2.php', array('Test1'))
+
+    ), 'my-ctx')
+    ->register('assets', array(
 
      array('styles', 'asset1', './assets/asset1.css')
     ,array('styles', 'asset2', './assets/asset2.css', array('asset1'))
-    ,array('styles', 'asset3', array('/* asset 3 */'), array('asset1','asset2'))
 
-    ))
-    ->on('import-class-Test2', 'console_log')
+    )/*global ctx*/)
+    ->register('assets', array(
+
+    array('styles', 'asset3', array('/* asset 3 */'), array('asset1','asset2'))
+
+    ), 'my-ctx')
+    ->on('import-class-Test2', 'console_log', 'my-ctx')
 ;
 
 
-$importer->load('Test2');
+$importer->load('Test2', 'my-ctx');
 
 echo $importer->get('./classes/Test1.php') . PHP_EOL;
-$importer->enqueue('styles', 'asset3');
-echo($importer->assets('styles'));
+$importer->enqueue('styles', 'asset3', 'my-ctx');
+echo($importer->assets('styles', 'my-ctx'));
