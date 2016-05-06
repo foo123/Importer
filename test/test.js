@@ -32,9 +32,9 @@ var importer = Importer( __dirname, 'http://_mygit/Importer/test/' )
     }, 'my-ctx')
 ;
 
-importer.load('Test2', 'my-ctx'/*, function( Test2 ){
+importer.load('Test2', /*function( Test2 ){
     echo(Test2());
-}*/);
+}*/ 'my-ctx');
 
 importer.get('./classes/Test1.js', function( text ){
     echo( text );

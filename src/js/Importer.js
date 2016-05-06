@@ -1314,8 +1314,18 @@ Importer[PROTO] = {
         return out;
     }
     
-    ,enqueue: function( type, id, ctx, asset, deps, props ) {
-        var self = this, assets = self._assets;
+    ,enqueue: function( type, id, asset_def, ctx ) {
+        var self = this, assets = self._assets, asset = null, deps = null, props = null;
+        if ( is_array(asset_def) )
+        {
+            asset = asset_def[0]||null;
+            deps = asset_def[1]||null;
+            props = asset_def[2]||null;
+        }
+        else
+        {
+            ctx = asset_def;
+        }
         if ( null == ctx ) ctx = '__global__';
         if ( ctx && !empty(type) && !empty(id) )
         {
@@ -1371,12 +1381,20 @@ Importer[PROTO] = {
         }
     }
     
-    ,load: function( classname, ctx, path, deps, complete ) {
-        var self = this, argslen = arguments.length, l, c, i, loader, ctx2;
-        if ( null == ctx ) ctx = '__global__';
+    ,load: function( classname, class_def, complete, ctx ) {
+        var self = this, argslen = arguments.length, l, c, i, loader, ctx2, path = null, deps = null;
         if ( is_array(classname) )
         {
-            complete = path;
+            if ( is_callable(class_def) )
+            {
+                ctx = complete;
+                complete = class_def;
+            }
+            else
+            {
+                ctx = class_def;
+            }
+            if ( null == ctx ) ctx = '__global__';
             l = classname.length; c = new Array( l ); i = 0;
             loader = function loader( loaded ) {
                 if ( arguments.length )
@@ -1396,23 +1414,21 @@ Importer[PROTO] = {
         }
         else
         {
-            /*if ( argslen < 5 ) 
+            if ( is_callable(class_def) ) 
             {
-                ctx = '__global__';
-            }*/
-            if ( argslen < 5 && is_callable(deps) ) 
-            {
-                //ctx = '__global__';
-                complete = deps;
-                deps = null;
+                ctx = complete;
+                complete = class_def;
             }
-            else if ( argslen < 4 && is_callable(path) ) 
+            if ( is_array(class_def) ) 
             {
-                //ctx = '__global__';
-                complete = path;
-                path = null;
-                deps = null;
+                path = class_def[0]||null;
+                deps = class_def[1]||null;
             }
+            else
+            {
+                ctx = class_def;
+            }
+            if ( null == ctx ) ctx = '__global__';
             if ( (!self._classes[HAS](ctx) || !self._classes[ctx][HAS](classname)) && !self._classes['__global__'][HAS](classname) && !empty(path) )
                 self.register('classes', [classname, classname, self.path(path), deps], ctx);
             ctx2 = self._classes[HAS](ctx) && self._classes[ctx][HAS](classname) ? ctx : '__global__';

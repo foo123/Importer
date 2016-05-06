@@ -241,6 +241,7 @@ class Importer
     
     public function register( $what, $defs, $ctx='__global__' )
     {
+        if ( null == $ctx ) $ctx = '__global__';
         if ( !empty($ctx) && is_array( $defs ) && !empty( $defs ) )
         {
             if ( !isset( $defs[0] ) || !is_array( $defs[0] ) ) $defs = array($defs); // make array of arrays
@@ -298,6 +299,7 @@ class Importer
     
     private function import_class( $id, $ctx='__global__', $require=true )
     {
+        if ( null == $ctx ) $ctx = '__global__';
         $queue = array( $id );
         while ( !empty( $queue ) )
         {
@@ -350,6 +352,7 @@ class Importer
     
     private function import_asset( $id, $ctx='__global__' )
     {
+        if ( null == $ctx ) $ctx = '__global__';
         $out = array( );
         $queue = array( $id );
         while ( !empty( $queue ) )
@@ -491,6 +494,7 @@ class Importer
     
     public function assets( $type='scripts', $ctx='__global__' )
     {
+        if ( null == $ctx ) $ctx = '__global__';
         if ( empty($ctx) || empty($this->_assets[$ctx]) ) return "";
         $out = array( );
         $type = strtolower($type);
@@ -503,8 +507,20 @@ class Importer
         return implode("\n", $out);
     }
     
-    public function enqueue( $type, $id, $ctx='__global__', $asset=null, $deps=array(), $props=array() )
+    public function enqueue( $type, $id, $asset_def=null, $ctx='__global__' )
     {
+        $asset = null; $deps = null; $props = null;
+        if ( is_array($asset_def) )
+        {
+            $asset = isset($asset_def[0]) ? $asset_def[0] : null;
+            $deps = isset($asset_def[1]) ? $asset_def[1] : null;
+            $props = isset($asset_def[2]) ? $asset_def[2] : null;
+        }
+        else
+        {
+            $ctx = $asset_def;
+        }
+        if ( null == $ctx ) $ctx = '__global__';
         if ( !empty($ctx) && !empty( $type ) && !empty( $id ) )
         {
             if ( isset( $this->_assets[$ctx][$id] ) ) 
@@ -558,21 +574,29 @@ class Importer
         return $data;
     }
     
-    public function load( $classname, $ctx='__global__', $path=null, $deps=array() )
+    public function load( $classname, $class_def=null, $ctx='__global__' )
     {
         if ( is_array($classname) )
         {
+            $ctx = $class_def;
+            if ( null == $ctx ) $ctx = '__global__';
             //$ctx = is_string($path) ? $path : '__global__';
             foreach($classname as $class)
                 $this->load( $class, $ctx );
         }
         else
         {
-            /*$nargs = func_num_args();
-            if ( $nargs < 4 )
+            $path = null; $deps = null;
+            if ( is_array($class_def) ) 
             {
-                $ctx = '__global__';
-            }*/
+                $path = isset($class_def[0]) ? $class_def[0] : null;
+                $deps = isset($class_def[1]) ? $class_def[1] : null;
+            }
+            else
+            {
+                $ctx = $class_def;
+            }
+            if ( null == $ctx ) $ctx = '__global__';
             if ( !isset( $this->_classes[$ctx][$classname] ) && !isset( $this->_classes['__global__'][$classname] ) && !empty($path) )
                 $this->register('classes', array($classname, $classname, $this->path($path), $deps), $ctx);
             $ctx2 = isset( $this->_classes[$ctx][$classname] ) ? $ctx : '__global__';
