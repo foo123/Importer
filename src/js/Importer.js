@@ -1315,7 +1315,7 @@ Importer[PROTO] = {
     }
     
     ,enqueue: function( type, id, asset_def, ctx ) {
-        var self = this, assets = self._assets, asset = null, deps = null, props = null;
+        var self = this, assets = self._assets, ctx2, asset = null, deps = null, props = null;
         if ( is_array(asset_def) )
         {
             asset = asset_def[0]||null;
@@ -1329,16 +1329,17 @@ Importer[PROTO] = {
         if ( null == ctx ) ctx = '__global__';
         if ( ctx && !empty(type) && !empty(id) )
         {
-            if ( assets[HAS](ctx) && assets[ctx][HAS](id) ) 
+            ctx2 = assets[HAS](ctx) && assets[ctx][HAS](id) ? ctx : '__global__';
+            if ( assets[HAS](ctx2) && assets[ctx2][HAS](id) ) 
             {
-                assets[ctx][id][5] = true; // enqueued
+                assets[ctx2][id][5] = true; // enqueued
                 // hook here
                 self.trigger('enqueue-asset', [
                     // importer, id,      type,   asset
-                    self, id, type, assets[ctx][id][2]
+                    self, id, type, assets[ctx2][id][2]
                 ], ctx).trigger('enqueue-asset-'+id, [
                     // importer, id,      type,   asset
-                    self, id, type, assets[ctx][id][2]
+                    self, id, type, assets[ctx2][id][2]
                 ], ctx);
             }
             else if ( !empty(asset) ) 

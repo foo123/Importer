@@ -523,16 +523,17 @@ class Importer
         if ( null == $ctx ) $ctx = '__global__';
         if ( !empty($ctx) && !empty( $type ) && !empty( $id ) )
         {
-            if ( isset( $this->_assets[$ctx][$id] ) ) 
+            $ctx2 = isset( $this->_assets[$ctx][$id] ) ? $ctx : '__global__';
+            if ( isset( $this->_assets[$ctx2][$id] ) ) 
             {
-                $this->_assets[$ctx][$id][5] = true; // enqueued
+                $this->_assets[$ctx2][$id][5] = true; // enqueued
                 // hook here
                 $this->trigger('enqueue-asset', array(
                     // $importer, $id,      $type,   $asset
-                    $this, $id, $type, $this->_assets[$ctx][$id][2]
+                    $this, $id, $type, $this->_assets[$ctx2][$id][2]
                 ), $ctx)->trigger("enqueue-asset-{$id}", array(
                     // $importer, $id,      $type,   $asset
-                    $this, $id, $type, $this->_assets[$ctx][$id][2]
+                    $this, $id, $type, $this->_assets[$ctx2][$id][2]
                 ), $ctx);
             }
             elseif ( !empty( $asset ) ) 
