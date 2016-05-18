@@ -3,14 +3,14 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.6
+*  @version 0.3.7
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer') )
 { 
 class Importer
 {
-    const VERSION = '0.3.6';
+    const VERSION = '0.3.7';
 
     const D_S = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -327,11 +327,29 @@ class Importer
                         if ( $needs_deps ) continue;
                         else array_shift( $queue );
                     }
+                    else
+                    {
+                        array_shift( $queue );
+                    }
                     $this->_classes[$ctx2][$id][4] = true; // loaded
                     
                     if ( false === $require ) @include( $this->_classes[$ctx2][$id][2] );
                     else require( $this->_classes[$ctx2][$id][2] );
                     
+                    // hook here
+                    $this->trigger("import-class", array(
+                        // $importer, $id,      $classname,   $path
+                        $this, $id, $this->_classes[$ctx2][$id][0], $this->_classes[$ctx2][$id][2]
+                    ), $ctx)->trigger("import-class-{$id}", array(
+                        // $importer, $id,      $classname,   $path
+                        $this, $id, $this->_classes[$ctx2][$id][0], $this->_classes[$ctx2][$id][2]
+                    ), $ctx);
+                }
+                else
+                {
+                    array_shift( $queue );
+                    $this->_classes[$ctx2][$id][4] = true; // loaded
+                    // trigger events, even if this class is already loaded somewhere else, but not this instance
                     // hook here
                     $this->trigger("import-class", array(
                         // $importer, $id,      $classname,   $path
@@ -384,6 +402,10 @@ class Importer
                     }
                     if ( $needs_deps ) continue;
                     else array_shift( $queue );
+                }
+                else
+                {
+                    array_shift( $queue );
                 }
                 $asset_def[6] = true; // loaded
                 

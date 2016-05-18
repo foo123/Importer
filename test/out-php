@@ -1,4 +1,4 @@
-Importer.VERSION = 0.3.6
+Importer.VERSION = 0.3.7
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
 Test1.php
 Test2.php

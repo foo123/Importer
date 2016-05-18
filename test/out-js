@@ -1,10 +1,11 @@
-Importer.VERSION = 0.3.6
+Importer.VERSION = 0.3.7
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\js
 Test1.js
 Test2.js
 Callback
 { '0': 
-   { base: 'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test',
+   Importer {
+     base: 'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test',
      base_url: 'http://_mygit/Importer/test/',
      _classes: { __global__: [Object], 'my-ctx': [Object] },
      _assets: { __global__: [Object], 'my-ctx': [Object] },

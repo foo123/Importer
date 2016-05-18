@@ -2,7 +2,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.6
+*  @version 0.3.7
 *  https://github.com/foo123/Importer
 **/
 !function( root, name, factory ) {
@@ -246,9 +246,30 @@ function load_deps( importer, scope, cache, ref, complete )
     {
         for (i=0; i<dl; i++)
         {
-            if ( cache[HAS](ref[i].ctx+'--'+ref[ i ].cache_id) ) loaded[ i ] = cache[ ref[i].ctx+'--'+ref[ i ].cache_id ];
-            else if ( 'class' !== ref[ i ].type ) loaded[ i ] = cache[ ref[i].ctx+'--'+ref[ i ].cache_id ] = read_file( ref[ i ].path, isXPCOM ? 'UTF-8' : 'utf8' );
-            else if ( ref[ i ].name in scope ) loaded[ i ] = scope[ ref[ i ].name ];
+            if ( ref[i][HAS]('loaded') )
+            {
+                loaded[ i ] = ref[i].loaded;
+                // hook here
+                importer.trigger('import-class', [
+                    //          this,     id,        classname,   path,        reference
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                ], ref[i].ctx).trigger('import-class-'+ref[i].id, [
+                    //          this,     id,        classname,   path,        reference
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                ], ref[i].ctx);
+            }
+            else if ( cache[HAS](ref[i].ctx+'--'+ref[ i ].cache_id) )
+            {
+                loaded[ i ] = cache[ ref[i].ctx+'--'+ref[ i ].cache_id ];
+            }
+            else if ( 'class' !== ref[ i ].type )
+            {
+                loaded[ i ] = cache[ ref[i].ctx+'--'+ref[ i ].cache_id ] = read_file( ref[ i ].path, isXPCOM ? 'UTF-8' : 'utf8' );
+            }
+            else if ( ref[ i ].name in scope )
+            {
+                loaded[ i ] = scope[ ref[ i ].name ];
+            }
             else
             {                
                 loaded[ i ] = import_module( ref[ i ].name, ref[ i ].path, scope ) || null;
@@ -332,9 +353,9 @@ function load_deps( importer, scope, cache, ref, complete )
         };
         next = function next( ) {
             var cached;
-            if ( (cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope) )
+            if ( ref[i][HAS]('loaded') || (cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope) )
             {
-                loaded[ i ] = (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
+                loaded[ i ] = (ref[i][HAS]('loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
                 
                 // hook here
                 importer.trigger('import-class', [
@@ -349,9 +370,9 @@ function load_deps( importer, scope, cache, ref, complete )
                 {
                     complete.apply( scope, loaded );
                 }
-                else if ( (cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope) ) 
+                else if ( ref[i][HAS]('loaded') || (cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope) ) 
                 {
-                    loaded[ i ] = (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
+                    loaded[ i ] = (ref[i][HAS]('loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
                     next( ); 
                 }
                 else
@@ -379,9 +400,9 @@ function load_deps( importer, scope, cache, ref, complete )
                 i++; next( ); 
             }
         };
-        while ( i < dl && ((cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope)) ) 
+        while ( i < dl && (ref[i][HAS]('loaded') || (cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope)) ) 
         {
-            loaded[ i ] = (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ]) || null;
+            loaded[ i ] = (ref[i][HAS]('loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
             i++;
         }
         if ( i < dl ) load( ref[ i ].cache_id, ref[ i ].ctx, ref[ i ].type, ref[ i ].path, next );
@@ -753,7 +774,7 @@ Importer = function Importer( base, base_url ) {
     self._cache = { };
 };
 
-Importer.VERSION = '0.3.6';
+Importer.VERSION = '0.3.7';
 Importer.BASE = './';
 Importer.path_join = path_join;
 Importer.join_path = join_path;
@@ -986,6 +1007,10 @@ Importer[PROTO] = {
                             if ( needs_deps ) continue;
                             else queue.shift( );
                         }
+                        else
+                        {
+                            queue.shift( );
+                        }
                         classes[ctx2][id][4] = true; // loaded
                         to_load.push({
                             id: id,
@@ -998,8 +1023,18 @@ Importer[PROTO] = {
                     }
                     else
                     {
+                        queue.shift( );
                         classes[ctx2][id][4] = true; // loaded
-                        cache[ ctx+'--class-' + id ] = Scope[ classes[ctx2][id][0] ];
+                        // trigger events, even if this class is already loaded somewhere else, but not this instance
+                        to_load.push({
+                            id: id,
+                            type: 'class',
+                            cache_id: 'class-' + id,
+                            name: classes[ctx2][id][0],
+                            path: classes[ctx2][id][2],
+                            ctx: ctx,
+                            loaded: Scope[ classes[ctx2][id][0] ]
+                        });
                     }
                 }
                 else if ( classes[ctx2][HAS](id) )
