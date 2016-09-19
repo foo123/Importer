@@ -2,25 +2,24 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.7
+*  @version 0.3.8
 *  https://github.com/foo123/Importer
 **/
-!function( root, name, factory ) {
+!function( root, name, factory ){
 "use strict";
-var m;
 if ( ('undefined'!==typeof Components)&&('object'===typeof Components.classes)&&('object'===typeof Components.classesByID)&&Components.utils&&('function'===typeof Components.utils['import']) ) /* XPCOM */
-    (root.EXPORTED_SYMBOLS = [ name ]) && (root[ name ] = factory.call( root ));
+    (root.$deps = root.$deps||{}) && (root.EXPORTED_SYMBOLS = [name]) && (root[name] = root.$deps[name] = factory.call(root));
 else if ( ('object'===typeof module)&&module.exports ) /* CommonJS */
-    module.exports = factory.call( root );
+    (module.$deps = module.$deps||{}) && (module.exports = module.$deps[name] = factory.call(root));
 else if ( ('undefined'!==typeof System)&&('function'===typeof System.register)&&('function'===typeof System['import']) ) /* ES6 module */
-    System.register(name,[],function( $__export ){$__export(name, factory.call( root ));});
-else if ( ('function'===typeof define)&&define.amd&&('function'===typeof require)&&('function'===typeof require.specified)&&require.specified(name) ) /* AMD */
-    define(name,['require','exports','module'],function( ){return factory.call( root );});
+    System.register(name,[],function($__export){$__export(name, factory.call(root));});
+else if ( ('function'===typeof define)&&define.amd&&('function'===typeof require)&&('function'===typeof require.specified)&&require.specified(name) /*&& !require.defined(name)*/ ) /* AMD */
+    define(name,['module'],function(module){factory.moduleUri = module.uri; return factory.call(root);});
 else if ( !(name in root) ) /* Browser/WebWorker/.. */
-    (root[ name ] = (m=factory.call( root )))&&('function'===typeof(define))&&define.amd&&define(function( ){return m;} );
+    (root[name] = factory.call(root)||1)&&('function'===typeof(define))&&define.amd&&define(function(){return root[name];} );
 }(  /* current root */          this, 
     /* module name */           "Importer",
-    /* module factory */        function( undef ) {
+    /* module factory */        function ModuleFactory__Importer( undef ){
 "use strict";
 
 var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 'toLowerCase',
@@ -512,6 +511,19 @@ function $$css( style, css )
 function $$asset( type, src, unique, atts )
 {
     var asset = null, link = null, i, links;
+    if ( 'html' === type )
+    {
+        var wrapper = $$el('div');
+        wrapper.innerHTML += src;
+        while(wrapper.firstChild)
+        {
+            if ( "SCRIPT" === asset.firstChild.nodeName ||
+                "STYLE" === asset.firstChild.nodeName ||
+                "LINK" === asset.firstChild.nodeName ) asset = wrapper.firstChild;
+            document.head.appendChild( wrapper.firstChild );
+        }
+        return asset;
+    }
     switch( type )
     {
         // external tpl
@@ -774,7 +786,7 @@ Importer = function Importer( base, base_url ) {
     self._cache = { };
 };
 
-Importer.VERSION = '0.3.7';
+Importer.VERSION = '0.3.8';
 Importer.BASE = './';
 Importer.path_join = path_join;
 Importer.join_path = join_path;
@@ -943,7 +955,7 @@ Importer[PROTO] = {
                     if ( !empty( type ) && !empty( id ) && !empty( asset ) ) 
                     {
                         type = type[LOWER]( );
-                        if ( 'scripts-composite' === type || 'styles-composite' === type )
+                        if ( 'scripts-composite' === type || 'styles-composite' === type || 'scripts-alt' === type || 'styles-alt' === type )
                         {
                             asset = array(asset);
                         }
@@ -1066,7 +1078,8 @@ Importer[PROTO] = {
     ,import_asset: function( id, ctx ) {
         var self = this, queue = [ id ], assets = self._assets, deps, props, atts,
             needs_deps, numdeps, i, dep, out = [ ], asset_def, type, asset, asset_id,
-            is_style, is_script, is_tpl, is_composite, is_inlined, pi, pl, document_asset, ret, ctx2, ctx3;
+            is_style, is_script, is_tpl, is_composite, is_alt, is_inlined,
+            pi, pl, document_asset, ret, ctx2, ctx3;
         if ( null == ctx ) ctx = '__global__';
         while ( queue.length )
         {
@@ -1121,7 +1134,8 @@ Importer[PROTO] = {
                     is_script = 'scripts' === type || 'scripts-composite' === type;
                     is_tpl = 'templates' === type;
                     is_composite = 'scripts-composite' === type || 'styles-composite' === type;
-                    is_inlined = !is_composite && is_array( asset );
+                    is_alt = 'scripts-alt' === type || 'styles-alt' === type;
+                    is_inlined = !is_composite && !is_alt && is_array( asset );
                     asset_id = id.replace(ID_RE, '_');
                     if ( is_style )
                     {
@@ -1159,6 +1173,13 @@ Importer[PROTO] = {
                                     }
                                 }
                             }
+                            else if ( is_alt )
+                            {
+                                out.push(
+                                document_asset = $$('importer-style-'+asset_id) || $$asset( 'html', asset[0] )
+                                );
+                                document_asset[ATTR]('id', 'importer-style-'+asset_id);
+                            }
                             else
                             {
                                 out.push(
@@ -1193,6 +1214,12 @@ Importer[PROTO] = {
                                         );
                                     }
                                 }
+                            }
+                            else if ( is_alt )
+                            {
+                                out.push(
+                                asset[0]
+                                );
                             }
                             else
                             {
@@ -1237,6 +1264,13 @@ Importer[PROTO] = {
                                     }
                                 }
                             }
+                            else if ( is_alt )
+                            {
+                                out.push(
+                                document_asset = $$('importer-script-'+asset_id) || $$asset( 'html', asset[0] )
+                                );
+                                document_asset[ATTR]('id', 'importer-script-'+asset_id);
+                            }
                             else
                             {
                                 out.push(
@@ -1271,6 +1305,12 @@ Importer[PROTO] = {
                                         );
                                     }
                                 }
+                            }
+                            else if ( is_alt )
+                            {
+                                out.push(
+                                asset[0]
+                                );
                             }
                             else
                             {
@@ -1318,17 +1358,18 @@ Importer[PROTO] = {
     
     ,assets: function( type, ctx ) {
         var self = this, out, assets = self._assets, next,
-            id, asset_def, i, l, to_load = [ ], type_composite;
+            id, asset_def, i, l, to_load = [ ], type_composite, type_alt;
         if ( !arguments.length ) {type = 'scripts'; ctx='__global__';}
         if ( null == ctx ) ctx = '__global__';
         if ( !ctx || !assets[HAS](ctx) ) return '';
         type = type[LOWER]( );
         type_composite = type + '-composite';
+        type_alt = type + '-alt';
         for (id in assets[ctx])
         {
             if ( !assets[ctx][HAS](id) ) continue;
             asset_def = assets[ctx][id];
-            if ( (type === asset_def[0] || type_composite === asset_def[0]) && asset_def[5] && !asset_def[6] )
+            if ( (type === asset_def[0] || type_composite === asset_def[0] || type_alt === asset_def[0]) && asset_def[5] && !asset_def[6] )
             {
                 to_load.push( asset_def[1] );
             }

@@ -3,14 +3,14 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.7
+*  @version 0.3.8
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer') )
 { 
 class Importer
 {
-    const VERSION = '0.3.7';
+    const VERSION = '0.3.8';
 
     const D_S = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -277,7 +277,7 @@ class Importer
                     if ( !empty( $type ) && !empty( $id ) && !empty( $asset ) ) 
                     {
                         $type = strtolower($type);
-                        if ( 'scripts-composite' === $type || 'styles-composite' === $type )
+                        if ( 'scripts-composite' === $type || 'styles-composite' === $type || 'scripts-alt' === $type || 'styles-alt' === $type )
                         {
                             $asset = (array)$asset;
                         }
@@ -425,11 +425,12 @@ class Importer
                 }
                 else
                 {
-                    $is_style = (bool)('styles' === $type || 'styles-composite' === $type);
-                    $is_script = (bool)('scripts' === $type || 'scripts-composite' === $type);
+                    $is_style = (bool)('styles' === $type || 'styles-composite' === $type || 'styles-alt' === $type);
+                    $is_script = (bool)('scripts' === $type || 'scripts-composite' === $type || 'scripts-alt' === $type);
                     $is_tpl = (bool)('templates' === $type);
                     $is_composite = (bool)('scripts-composite' === $type || 'styles-composite' === $type);
-                    $is_inlined = !$is_composite && is_array($asset);
+                    $is_alt = (bool)('scripts-alt' === $type || 'styles-alt' === $type);
+                    $is_inlined = !$is_composite && !$is_alt && is_array($asset);
                     $asset_id = preg_replace( '/[\\-.\\/\\\\:]+/', '_', $id);
                     if ( $is_style )
                     {
@@ -455,6 +456,10 @@ class Importer
                                     $out[] = "<link id=\"importer-style-{$asset_id}-part-{$pi}\" href=\"".$this->path_url($part)."\" rel=\"stylesheet\" {$attributes} />";
                                 }
                             }
+                        }
+                        elseif ( $is_alt )
+                        {
+                            $out[] = $asset[0];
                         }
                         else
                         {
@@ -484,6 +489,10 @@ class Importer
                                     $out[] = "<script id=\"importer-script-{$asset_id}-part-{$pi}\" src=\"".$this->path_url($part)."\" {$attributes}></script>";
                                 }
                             }
+                        }
+                        elseif ( $is_alt )
+                        {
+                            $out[] = $asset[0];
                         }
                         else
                         {
@@ -521,9 +530,10 @@ class Importer
         $out = array( );
         $type = strtolower($type);
         $type_composite = $type . '-composite';
+        $type_alt = $type . '-alt';
         foreach ($this->_assets[$ctx] as $asset_def)
         {
-            if ( ($type === $asset_def[0] || $type_composite === $asset_def[0]) && $asset_def[5] && !$asset_def[6] )
+            if ( ($type === $asset_def[0] || $type_composite === $asset_def[0] || $type_alt === $asset_def[0]) && $asset_def[5] && !$asset_def[6] )
                 $out = array_merge($out, $this->import_asset($asset_def[1], $ctx));
         }
         return implode("\n", $out);
