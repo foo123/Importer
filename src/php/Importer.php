@@ -118,6 +118,7 @@ class Importer
     
     private $base = null;
     private $base_url = null;
+    private $_namespaces = null;
     private $_classes = null;
     private $_assets = null;
     private $_hooks = null;
