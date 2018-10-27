@@ -259,7 +259,15 @@ class Importer
             if ( 'namespaces' === $what )
             {
                 if ( !isset($this->_namespaces[$ctx]) ) $this->_namespaces[$ctx] = array();
-                $this->_namespaces[$ctx] = array_merge($this->_namespaces[$ctx], $defs);
+                foreach($defs as $namespace=>$path)
+                {
+                    $first = $namespace[0];
+                    if ( !isset($this->_namespaces[$ctx][$first]) )
+                        $this->_namespaces[$ctx][$first] = array();
+                    if ( '\\' !== substr($namespace, -1) ) $namespace .= '\\';
+                    $path = rtrim($path, '/\\') . DIRECTORY_SEPARATOR;
+                    $this->_namespaces[$ctx][$first][] = array($namespace, $path);
+                }
             }
             elseif ( 'classes' === $what )
             {
@@ -658,16 +666,23 @@ class Importer
     public function _autoload_( $class )
     {
         $ctx = '__global__'; // anyway to add custom context here??
-        foreach($this->_namespaces[$ctx] as $namespace=>$path)
+        $first = $class[0];
+        $namespaces = !empty($this->_namespaces[$ctx][$first]) ? $this->_namespaces[$ctx][$first] : null;
+        if ( !$namespaces ) return;
+        // Psr-4 style namespaces loaded
+        foreach($namespaces as $namespace)
         {
-            // Psr-4 style namespaces loaded
-            if ( self::startsWith($class, $namespace) )
+            if ( self::startsWith($class, $namespace[0]) )
             {
-                $file = rtrim($path,'/\\') . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace))) . '.php';
-                __importer_include_file__($file, true);
-                return true;
+                $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
+                if ( file_exists($file) )
+                {
+                    __importer_include_file__($file, true);
+                    return true;
+                }
             }
         }
+        // Psr-0 style namespaces support??
     }
     
     public function register_autoload( $prepend = false )
