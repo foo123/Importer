@@ -1,4 +1,4 @@
-Importer.VERSION = 0.3.7
+Importer.VERSION = 1.0.0
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
 Test1.php
 Test2.php
@@ -135,6 +135,14 @@ Array
 
                                 )
 
+                        )
+
+                )
+
+            [_namespaces] => Array
+                (
+                    [__global__] => Array
+                        (
                         )
 
                 )

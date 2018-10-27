@@ -3,14 +3,23 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.9
+*  @version 1.0.0
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer', false) )
-{ 
+{
+function __importer_include_file__( $file, $require=true )
+{
+    // isolate included file from $this and other variables of importer class
+    if ( false===$require )
+        @include($file);
+    else
+        require_once($file);
+}
+
 class Importer
 {
-    const VERSION = '0.3.9';
+    const VERSION = '1.0.0';
 
     const D_S = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -120,6 +129,7 @@ class Importer
     
     public function __construct( $base='', $base_url='' )
     {
+        $this->_namespaces = array( '__global__'=>array( ) );
         $this->_classes = array( '__global__'=>array( ) );
         $this->_assets = array( '__global__'=>array( ) );
         $this->_hooks = array( '__global__'=>array( ) );
@@ -135,6 +145,7 @@ class Importer
     
     public function dispose( )
     {
+        $this->_namespaces = null;
         $this->_classes = null;
         $this->_assets = null;
         $this->_hooks = null;
@@ -244,10 +255,14 @@ class Importer
         if ( null == $ctx ) $ctx = '__global__';
         if ( !empty($ctx) && is_array( $defs ) && !empty( $defs ) )
         {
-            if ( !isset( $defs[0] ) || !is_array( $defs[0] ) ) $defs = array($defs); // make array of arrays
-            
-            if ( 'classes' === $what )
+            if ( 'namespaces' === $what )
             {
+                if ( !isset($this->_namespaces[$ctx]) ) $this->_namespaces[$ctx] = array();
+                $this->_namespaces[$ctx] = array_merge($this->_namespaces[$ctx], $defs);
+            }
+            elseif ( 'classes' === $what )
+            {
+                if ( !isset( $defs[0] ) || !is_array( $defs[0] ) ) $defs = array($defs); // make array of arrays
                 if ( !isset($this->_classes[$ctx]) ) $this->_classes[$ctx] = array();
                 foreach ($defs as $def)
                 {
@@ -268,6 +283,7 @@ class Importer
             }
             elseif ( 'assets' === $what )
             {
+                if ( !isset( $defs[0] ) || !is_array( $defs[0] ) ) $defs = array($defs); // make array of arrays
                 if ( !isset($this->_assets[$ctx]) ) $this->_assets[$ctx] = array();
                 foreach ($defs as $def)
                 {
@@ -333,8 +349,7 @@ class Importer
                     }
                     $this->_classes[$ctx2][$id][4] = true; // loaded
                     
-                    if ( false === $require ) @include( $this->_classes[$ctx2][$id][2] );
-                    else require( $this->_classes[$ctx2][$id][2] );
+                    __importer_include_file__($this->_classes[$ctx2][$id][2], $require);
                     
                     // hook here
                     $this->trigger("import-class", array(
@@ -636,6 +651,33 @@ class Importer
             if ( isset( $this->_classes[$ctx2][$classname] ) && !$this->_classes[$ctx2][$classname][4] && file_exists( $this->_classes[$ctx2][$classname][2] ) )
                 $this->import_class($classname, $ctx2);
         }
+        return $this;
+    }
+    
+    public function _autoload_( $class )
+    {
+        $ctx = '__global__'; // anyway to add custom context here??
+        foreach($this->_namespaces[$ctx] as $namespace=>$path)
+        {
+            // Psr-4 style namespaces loaded
+            if ( self::startsWith($class, $namespace) )
+            {
+                $file = rtrim($path,'/\\') . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace))) . '.php';
+                __importer_include_file__($file, true);
+                return true;
+            }
+        }
+    }
+    
+    public function register_autoload( $prepend = false )
+    {
+        spl_autoload_register(array($this, '_autoload_'), true, $prepend);
+        return $this;
+    }
+    
+    public function unregister_autoload( )
+    {
+        spl_autoload_unregister(array($this, '_autoload_'));
         return $this;
     }
 }

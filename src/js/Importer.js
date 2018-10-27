@@ -2,7 +2,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 0.3.9
+*  @version 1.0.0
 *  https://github.com/foo123/Importer
 **/
 !function( root, name, factory ){
@@ -22,7 +22,7 @@ else if ( !(name in root) ) /* Browser/WebWorker/.. */
     /* module factory */        function ModuleFactory__Importer( undef ){
 "use strict";
 
-var PROTO = 'prototype', HAS = 'hasOwnProperty', ATTR = 'setAttribute', LOWER = 'toLowerCase',
+var PROTO = 'prototype', HAS = Object[PROTO].hasOwnProperty, ATTR = 'setAttribute', LOWER = 'toLowerCase',
     toString = Object[PROTO].toString, map = Array[PROTO].map, KEYS = Object.keys,
     startsWith = String[PROTO].startsWith 
             ? function( s, pre, pos ){return s.startsWith(pre, pos||0);} 
@@ -245,7 +245,7 @@ function load_deps( importer, scope, cache, ref, complete )
     {
         for (i=0; i<dl; i++)
         {
-            if ( ref[i][HAS]('loaded') )
+            if ( HAS.call(ref[i],'loaded') )
             {
                 loaded[ i ] = ref[i].loaded;
                 // hook here
@@ -257,7 +257,7 @@ function load_deps( importer, scope, cache, ref, complete )
                     importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
                 ], ref[i].ctx);
             }
-            else if ( cache[HAS](ref[i].ctx+'--'+ref[ i ].cache_id) )
+            else if ( HAS.call(cache,ref[i].ctx+'--'+ref[ i ].cache_id) )
             {
                 loaded[ i ] = cache[ ref[i].ctx+'--'+ref[ i ].cache_id ];
             }
@@ -352,9 +352,9 @@ function load_deps( importer, scope, cache, ref, complete )
         };
         next = function next( ) {
             var cached;
-            if ( ref[i][HAS]('loaded') || (cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope) )
+            if ( HAS.call(ref[i],'loaded') || (cached=HAS.call(cache,ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope) )
             {
-                loaded[ i ] = (ref[i][HAS]('loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
+                loaded[ i ] = (HAS.call(ref[i],'loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
                 
                 // hook here
                 importer.trigger('import-class', [
@@ -369,9 +369,9 @@ function load_deps( importer, scope, cache, ref, complete )
                 {
                     complete.apply( scope, loaded );
                 }
-                else if ( ref[i][HAS]('loaded') || (cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope) ) 
+                else if ( HAS.call(ref[i],'loaded') || (cached=HAS.call(cache,ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope) ) 
                 {
-                    loaded[ i ] = (ref[i][HAS]('loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
+                    loaded[ i ] = (HAS.call(ref[i],'loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
                     next( ); 
                 }
                 else
@@ -399,9 +399,9 @@ function load_deps( importer, scope, cache, ref, complete )
                 i++; next( ); 
             }
         };
-        while ( i < dl && (ref[i][HAS]('loaded') || (cached=cache[HAS](ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope)) ) 
+        while ( i < dl && (HAS.call(ref[i],'loaded') || (cached=HAS.call(cache,ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope)) ) 
         {
-            loaded[ i ] = (ref[i][HAS]('loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
+            loaded[ i ] = (HAS.call(ref[i],'loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
             i++;
         }
         if ( i < dl ) load( ref[ i ].cache_id, ref[ i ].ctx, ref[ i ].type, ref[ i ].path, next );
@@ -482,7 +482,7 @@ function $$css( style, css )
         index = 0;
         for (n in css)
         {
-            if ( !css[HAS](n) ) continue;
+            if ( !HAS.call(css,n) ) continue;
             declaration = css[ n ];
             selector = declaration.selector;
             rules = [].concat(declaration.rules).join('; ');
@@ -786,7 +786,7 @@ Importer = function Importer( base, base_url ) {
     self._cache = { };
 };
 
-Importer.VERSION = '0.3.9';
+Importer.VERSION = '1.0.0';
 Importer.BASE = './';
 Importer.path_join = path_join;
 Importer.join_path = join_path;
@@ -819,8 +819,8 @@ Importer[PROTO] = {
         if ( null == ctx ) ctx = '__global__';
         if ( ctx && !empty(hook) && is_callable(handler) )
         {
-            if ( !self._hooks[HAS](ctx) ) self._hooks[ctx] = {};
-            if ( !self._hooks[ctx][HAS](hook) ) self._hooks[ctx][hook] = [];
+            if ( !HAS.call(self._hooks,ctx) ) self._hooks[ctx] = {};
+            if ( !HAS.call(self._hooks[ctx],hook) ) self._hooks[ctx][hook] = [];
             self._hooks[ctx][hook].push( [handler, true === once, 0] );
         }
         return self;
@@ -833,7 +833,7 @@ Importer[PROTO] = {
     ,off: function( hook, handler, ctx ) {
         var self = this, hooks, i;
         if ( null == ctx ) ctx = '__global__';
-        if ( ctx && self._hooks[HAS](ctx) && !empty(hook) && !empty(self._hooks[ctx][hook]) )
+        if ( ctx && HAS.call(self._hooks,ctx) && !empty(hook) && !empty(self._hooks[ctx][hook]) )
         {
             if ( true === handler )
             {
@@ -855,7 +855,7 @@ Importer[PROTO] = {
     ,trigger: function( hook, args, ctx ) {
         var self = this, hooks, i, h, ret;
         if ( null == ctx ) ctx = '__global__';
-        if ( ctx && self._hooks[HAS](ctx) && !empty(hook) && !empty(self._hooks[ctx][hook]) )
+        if ( ctx && HAS.call(self._hooks,ctx) && !empty(hook) && !empty(self._hooks[ctx][hook]) )
         {
             hooks = self._hooks[ctx][hook];
             args = args || [];
@@ -932,7 +932,7 @@ Importer[PROTO] = {
                     classname = def[0]; id = def[1]; path = def[2]; deps = def[3] ? def[3] : [];
                     if ( !empty( classname ) && !empty( id ) && !empty( path ) ) 
                     {
-                        if ( !classes[HAS](ctx) ) classes[ctx] = {};
+                        if ( !HAS.call(classes,ctx) ) classes[ctx] = {};
                         classes[ctx][ id ] = [
                             /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
                             classname, 
@@ -964,7 +964,7 @@ Importer[PROTO] = {
                         {
                             asset = self.path_url( asset );
                         }
-                        if ( !assets[HAS](ctx) ) assets[ctx] = {};
+                        if ( !HAS.call(assets,ctx) ) assets[ctx] = {};
                         assets[ctx][ id ] = [
                             /* 0:type, 1:id, 2:asset, 3:deps, 4:props, 5:enqueued, 6:loaded */
                             type, id, asset, array(deps), props, false, false
@@ -982,7 +982,7 @@ Importer[PROTO] = {
             needs_deps, numdeps, i, dep, deps, to_load, ctx2, ctx3;
         
         if ( null == ctx ) ctx = '__global__';
-        if ( cache[HAS](ctx+'--'+cache_id) ) 
+        if ( HAS.call(cache,ctx+'--'+cache_id) ) 
         {
             if ( is_callable(complete) )
                 complete.call( self, cache[ctx+'--'+cache_id] );
@@ -995,11 +995,11 @@ Importer[PROTO] = {
             while ( queue.length )
             {
                 id = queue[ 0 ];
-                ctx2 = classes[HAS](ctx) && classes[ctx][HAS](id) ? ctx : '__global__';
-                if ( classes[ctx2][HAS](id) && !classes[ctx2][id][4] )
+                ctx2 = HAS.call(classes,ctx) && HAS.call(classes[ctx],id) ? ctx : '__global__';
+                if ( HAS.call(classes[ctx2],id) && !classes[ctx2][id][4] )
                 {
                     exists = true;
-                    if ( !Scope[HAS]( classes[ctx2][id][0] ) )
+                    if ( !HAS.call(Scope, classes[ctx2][id][0] ) )
                     {
                         deps = classes[ctx2][id][3];
                         if ( !empty(deps) )
@@ -1009,8 +1009,8 @@ Importer[PROTO] = {
                             for (i=numdeps-1; i>=0; i--)
                             {
                                 dep = deps[i];
-                                ctx3 = classes[HAS](ctx) && classes[ctx][HAS](dep) ? ctx : '__global__';
-                                if ( classes[ctx3][HAS](dep) && !classes[ctx3][dep][4] )
+                                ctx3 = HAS.call(classes,ctx) && HAS.call(classes[ctx],dep) ? ctx : '__global__';
+                                if ( HAS.call(classes[ctx3],dep) && !classes[ctx3][dep][4] )
                                 {
                                     needs_deps = true;
                                     queue.unshift( dep );
@@ -1049,7 +1049,7 @@ Importer[PROTO] = {
                         });
                     }
                 }
-                else if ( classes[ctx2][HAS](id) )
+                else if ( HAS.call(classes[ctx2],id) )
                 {
                     exists = true;
                     queue.shift( );
@@ -1084,8 +1084,8 @@ Importer[PROTO] = {
         while ( queue.length )
         {
             id = queue[ 0 ];
-            ctx2 = assets[HAS](ctx) && assets[ctx][HAS](id) ? ctx : '__global__';
-            if ( assets[ctx2][HAS](id) && assets[ctx2][id][5] && !assets[ctx2][id][6] ) // enqueued but not loaded yet
+            ctx2 = HAS.call(assets,ctx) && HAS.call(assets[ctx],id) ? ctx : '__global__';
+            if ( HAS.call(assets[ctx2],id) && assets[ctx2][id][5] && !assets[ctx2][id][6] ) // enqueued but not loaded yet
             {
                 asset_def = assets[ctx2][id];
                 type = asset_def[0]; 
@@ -1100,8 +1100,8 @@ Importer[PROTO] = {
                     for (i=numdeps-1; i>=0; i--)
                     {
                         dep = deps[i];
-                        ctx3 = assets[HAS](ctx) && assets[ctx][HAS](dep) ? ctx : '__global__';
-                        if ( assets[ctx3][HAS](dep) && !assets[ctx3][dep][6] )
+                        ctx3 = HAS.call(assets,ctx) && HAS.call(assets[ctx],dep) ? ctx : '__global__';
+                        if ( HAS.call(assets[ctx3],dep) && !assets[ctx3][dep][6] )
                         {
                             assets[ctx3][dep][5] = true; // enqueued
                             needs_deps = true;
@@ -1361,13 +1361,13 @@ Importer[PROTO] = {
             id, asset_def, i, l, to_load = [ ], type_composite, type_alt;
         if ( !arguments.length ) {type = 'scripts'; ctx='__global__';}
         if ( null == ctx ) ctx = '__global__';
-        if ( !ctx || !assets[HAS](ctx) ) return '';
+        if ( !ctx || !HAS.call(assets,ctx) ) return '';
         type = type[LOWER]( );
         type_composite = type + '-composite';
         type_alt = type + '-alt';
         for (id in assets[ctx])
         {
-            if ( !assets[ctx][HAS](id) ) continue;
+            if ( !HAS.call(assets[ctx],id) ) continue;
             asset_def = assets[ctx][id];
             if ( (type === asset_def[0] || type_composite === asset_def[0] || type_alt === asset_def[0]) && asset_def[5] && !asset_def[6] )
             {
@@ -1405,8 +1405,8 @@ Importer[PROTO] = {
         if ( null == ctx ) ctx = '__global__';
         if ( ctx && !empty(type) && !empty(id) )
         {
-            ctx2 = assets[HAS](ctx) && assets[ctx][HAS](id) ? ctx : '__global__';
-            if ( assets[HAS](ctx2) && assets[ctx2][HAS](id) ) 
+            ctx2 = HAS.call(assets,ctx) && HAS.call(assets[ctx],id) ? ctx : '__global__';
+            if ( HAS.call(assets,ctx2) && HAS.call(assets[ctx2],id) ) 
             {
                 assets[ctx2][id][5] = true; // enqueued
                 // hook here
@@ -1438,7 +1438,7 @@ Importer[PROTO] = {
     ,get: function( path, opts, complete ) {
         var self = this, encoding, file, default_value;
         opts = opts || { };
-        default_value = opts[HAS]('default') ? opts['default'] : '';
+        default_value = HAS.call(opts,'default') ? opts['default'] : '';
         encoding = opts.encoding || (isXPCOM ? 'UTF-8' : 'utf8');
         if ( !empty(opts.binary) ) encoding = 'binary';
         complete = complete || opts.complete || (is_callable( opts ) && opts);
@@ -1506,10 +1506,10 @@ Importer[PROTO] = {
                 ctx = class_def;
             }
             if ( null == ctx ) ctx = '__global__';
-            if ( (!self._classes[HAS](ctx) || !self._classes[ctx][HAS](classname)) && !self._classes['__global__'][HAS](classname) && !empty(path) )
+            if ( (!HAS.call(self._classes,ctx) || !HAS.call(self._classes[ctx],classname)) && !HAS.call(self._classes['__global__'],classname) && !empty(path) )
                 self.register('classes', [classname, classname, self.path(path), deps], ctx);
-            ctx2 = self._classes[HAS](ctx) && self._classes[ctx][HAS](classname) ? ctx : '__global__';
-            if ( self._classes[ctx2][HAS](classname) && !self._classes[ctx2][classname][4] )
+            ctx2 = HAS.call(self._classes,ctx) && HAS.call(self._classes[ctx],classname) ? ctx : '__global__';
+            if ( HAS.call(self._classes[ctx2],classname) && !self._classes[ctx2][classname][4] )
                 self.import_class( classname, complete, ctx2 );
             else if ( is_callable(complete) )
                 complete.call( self, self._cache[ctx2+'--class-'+classname]||null );

@@ -3,13 +3,13 @@
 #  Importer
 #  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 #
-#  @version 0.3.9
+#  @version 1.0.0
 #  https://github.com/foo123/Importer
 ##
 import os, re
 
 class Importer:
-    VERSION = '0.3.9'
+    VERSION = '1.0.0'
     
     DS = '/'
     DS_RE = '/\\/|\\\\/'
