@@ -32,7 +32,8 @@ class Importer
     // simulate python's "startswith" string method
     public static function startsWith( $str, $pre, $pos=0 ) 
     { 
-        return (bool)($pre === substr($str, $pos, strlen($pre))); 
+        return (bool)($pos === strpos($str, $pre, $pos));
+        //return (bool)($pre === substr($str, $pos, strlen($pre))); 
     }
     
     public static function remove_protocol( $p )
@@ -265,7 +266,7 @@ class Importer
                     if ( !isset($this->_namespaces[$ctx][$first]) )
                         $this->_namespaces[$ctx][$first] = array();
                     if ( '\\' !== substr($namespace, -1) ) $namespace .= '\\';
-                    $path = rtrim($path, '/\\') . DIRECTORY_SEPARATOR;
+                    $path = rtrim($this->path($path), '/\\') . DIRECTORY_SEPARATOR;
                     $this->_namespaces[$ctx][$first][] = array($namespace, $path);
                 }
             }
@@ -666,26 +667,123 @@ class Importer
     public function _autoload_( $class )
     {
         $ctx = '__global__'; // anyway to add custom context here??
-        $first = $class[0];
-        $namespaces = !empty($this->_namespaces[$ctx][$first]) ? $this->_namespaces[$ctx][$first] : null;
-        if ( !$namespaces ) return;
-        // Psr-4 style namespaces loaded
-        foreach($namespaces as $namespace)
+        
+        if ( false === strpos($class,'\\') )
         {
-            if ( self::startsWith($class, $namespace[0]) )
+            // try to load a simple class from classmap first, if exists
+            if ( isset($this->_classes[$ctx][$class]) && $class === $this->_classes[$ctx][$class][0] )
             {
-                $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
-                if ( file_exists($file) )
+                __importer_include_file__($this->_classes[$ctx][$class][2], true);
+                return true;
+            }
+            
+            if ( !empty($this->_classes[$ctx]) )
+            {
+                foreach($this->_classes[$ctx] as $id=>$def)
                 {
-                    __importer_include_file__($file, true);
+                    if ( $class === $def[0] )
+                    {
+                        __importer_include_file__($def[2], true);
+                        return true;
+                    }
+                }
+            }
+            
+            if ( '__global__' !== $ctx )
+            {
+                $ctx = '__global__';
+                if ( isset($this->_classes[$ctx][$class]) && $class === $this->_classes[$ctx][$class][0] )
+                {
+                    __importer_include_file__($this->_classes[$ctx][$class][2], true);
                     return true;
+                }
+                
+                if ( !empty($this->_classes[$ctx]) )
+                {
+                    foreach($this->_classes[$ctx] as $id=>$def)
+                    {
+                        if ( $class === $def[0] )
+                        {
+                            __importer_include_file__($def[2], true);
+                            return true;
+                        }
+                    }
                 }
             }
         }
-        // Psr-0 style namespaces support??
+        else
+        {
+            $first = $class[0];
+            // Psr-4 lookup
+            $logicalPathPsr4 = strtr($class, '\\', DIRECTORY_SEPARATOR) . '.php';
+            // Psr-0 lookup
+            if (false !== $pos = strrpos($class, '\\'))
+            {
+                // namespaced class name
+                $logicalPathPsr0 = substr($logicalPathPsr4, 0, $pos + 1).strtr(substr($logicalPathPsr4, $pos + 1), '_', DIRECTORY_SEPARATOR);
+            }
+            else
+            {
+                // PEAR-like class name
+                $logicalPathPsr0 = strtr($class, '_', DIRECTORY_SEPARATOR) . '.php';
+            }
+            $namespaces = !empty($this->_namespaces[$ctx][$first]) ? $this->_namespaces[$ctx][$first] : null;
+            if ( $namespaces )
+            {
+                foreach($namespaces as $namespace)
+                {
+                    if ( 0 === strpos($class, $namespace[0]) )
+                    {
+                        // psr-4
+                        $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
+                        if ( file_exists($file) )
+                        {
+                            __importer_include_file__($file, true);
+                            return true;
+                        }
+                        // psr-0
+                        $file = $namespace[1] . $logicalPathPsr0;
+                        if ( file_exists($file) )
+                        {
+                            __importer_include_file__($file, true);
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            if ( '__global__' !== $ctx )
+            {
+                $ctx = '__global__';
+                $namespaces = !empty($this->_namespaces[$ctx][$first]) ? $this->_namespaces[$ctx][$first] : null;
+                if ( $namespaces )
+                {
+                    foreach($namespaces as $namespace)
+                    {
+                        if ( 0 === strpos($class, $namespace[0]) )
+                        {
+                            // psr-4
+                            $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
+                            if ( file_exists($file) )
+                            {
+                                __importer_include_file__($file, true);
+                                return true;
+                            }
+                            // psr-0
+                            $file = $namespace[1] . $logicalPathPsr0;
+                            if ( file_exists($file) )
+                            {
+                                __importer_include_file__($file, true);
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
-    public function register_autoload( $prepend = false )
+    public function register_autoload( $prepend=false )
     {
         spl_autoload_register(array($this, '_autoload_'), true, $prepend);
         return $this;
