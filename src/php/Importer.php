@@ -3,7 +3,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 1.0.0
+*  @version 1.1.0
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer', false) )
@@ -19,7 +19,7 @@ function __importer_include_file__( $file, $require=true )
 
 class Importer
 {
-    const VERSION = '1.0.0';
+    const VERSION = '1.1.0';
 
     const D_S = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -120,6 +120,8 @@ class Importer
     private $base = null;
     private $base_url = null;
     private $_namespaces = null;
+    private $_namespaces0 = null;
+    private $_classmap = null;
     private $_classes = null;
     private $_assets = null;
     private $_hooks = null;
@@ -132,6 +134,8 @@ class Importer
     public function __construct( $base='', $base_url='' )
     {
         $this->_namespaces = array( '__global__'=>array( ) );
+        $this->_namespaces0 = array( '__global__'=>array( ) );
+        $this->_classmap = array( '__global__'=>array( ) );
         $this->_classes = array( '__global__'=>array( ) );
         $this->_assets = array( '__global__'=>array( ) );
         $this->_hooks = array( '__global__'=>array( ) );
@@ -148,6 +152,8 @@ class Importer
     public function dispose( )
     {
         $this->_namespaces = null;
+        $this->_namespaces0 = null;
+        $this->_classmap = null;
         $this->_classes = null;
         $this->_assets = null;
         $this->_hooks = null;
@@ -257,7 +263,20 @@ class Importer
         if ( null == $ctx ) $ctx = '__global__';
         if ( !empty($ctx) && is_array( $defs ) && !empty( $defs ) )
         {
-            if ( 'namespaces' === $what )
+            if ( ('psr-0' ===$what) || ('namespaces0' === $what) )
+            {
+                if ( !isset($this->_namespaces0[$ctx]) ) $this->_namespaces0[$ctx] = array();
+                foreach($defs as $namespace=>$path)
+                {
+                    $first = $namespace[0];
+                    if ( !isset($this->_namespaces0[$ctx][$first]) )
+                        $this->_namespaces0[$ctx][$first] = array();
+                    if ( '\\' !== substr($namespace, -1) ) $namespace .= '\\';
+                    $path = rtrim($this->path($path), '/\\') . DIRECTORY_SEPARATOR;
+                    $this->_namespaces0[$ctx][$first][] = array($namespace, $path);
+                }
+            }
+            elseif ( ('psr-4' === $what) || ('namespaces' === $what) )
             {
                 if ( !isset($this->_namespaces[$ctx]) ) $this->_namespaces[$ctx] = array();
                 foreach($defs as $namespace=>$path)
@@ -274,20 +293,23 @@ class Importer
             {
                 if ( !isset( $defs[0] ) || !is_array( $defs[0] ) ) $defs = array($defs); // make array of arrays
                 if ( !isset($this->_classes[$ctx]) ) $this->_classes[$ctx] = array();
+                if ( !isset($this->_classmap[$ctx]) ) $this->_classmap[$ctx] = array();
                 foreach ($defs as $def)
                 {
                     /* 0:class, 1:id, 2:path, 3:deps */
                     $classname = $def[0]; $id = $def[1]; $path = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     if ( !empty( $classname ) && !empty( $id ) && !empty( $path ) ) 
                     {
+                        $path = $this->path( $path );
                         $this->_classes[$ctx][ $id ] = array(
                             /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
                             $classname, 
                             $id, 
-                            $this->path( $path ), 
+                            $path, 
                             (array)$deps, 
                             false
                         );
+                        $this->_classmap[$ctx][ $classname ] = array($path, $id);
                     }
                 }
             }
@@ -664,84 +686,108 @@ class Importer
         return $this;
     }
     
-    public function _autoload_( $class )
+    public function __autoload__( $class )
     {
         $ctx = '__global__'; // anyway to add custom context here??
         
-        if ( false === strpos($class,'\\') )
+        if ( isset($this->_classmap[$ctx][$class]) )
         {
             // try to load a simple class from classmap first, if exists
-            if ( isset($this->_classes[$ctx][$class]) && $class === $this->_classes[$ctx][$class][0] )
+            //$this->import_class($this->_classmap[$ctx][$class][1]);
+            __importer_include_file__($this->_classmap[$ctx][$class][0], true);
+            return true;
+        }
+        
+        if ( '__global__' !== $ctx )
+        {
+            // try also the global ctx if different
+            if ( isset($this->_classmap['__global__'][$class]) )
             {
-                __importer_include_file__($this->_classes[$ctx][$class][2], true);
+                // try to load a simple class from classmap first, if exists
+                //$this->import_class($this->_classmap['__global__'][$class][1]);
+                __importer_include_file__($this->_classmap['__global__'][$class][0], true);
                 return true;
             }
-            
-            if ( !empty($this->_classes[$ctx]) )
+        }
+        
+        $first = $class[0];
+        // Psr-4 lookup
+        $logicalPathPsr4 = strtr($class, '\\', DIRECTORY_SEPARATOR) . '.php';
+        // Psr-0 lookup
+        if ( false !== ($pos=strrpos($class, '\\')) )
+        {
+            // namespaced class name
+            $logicalPathPsr0 = substr($logicalPathPsr4, 0, $pos + 1).strtr(substr($logicalPathPsr4, $pos + 1), '_', DIRECTORY_SEPARATOR);
+        }
+        else
+        {
+            // PEAR-like class name
+            $logicalPathPsr0 = strtr($class, '_', DIRECTORY_SEPARATOR) . '.php';
+        }
+        
+        // Psr-4
+        $namespaces = !empty($this->_namespaces[$ctx][$first]) ? $this->_namespaces[$ctx][$first] : null;
+        if ( $namespaces )
+        {
+            foreach($namespaces as $namespace)
             {
-                foreach($this->_classes[$ctx] as $id=>$def)
+                if ( 0 === strpos($class, $namespace[0]) )
                 {
-                    if ( $class === $def[0] )
+                    $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
+                    if ( file_exists($file) )
                     {
-                        __importer_include_file__($def[2], true);
+                        __importer_include_file__($file, true);
                         return true;
                     }
                 }
             }
-            
-            if ( '__global__' !== $ctx )
+        }
+        // Psr-0
+        $namespaces = !empty($this->_namespaces0[$ctx][$first]) ? $this->_namespaces0[$ctx][$first] : null;
+        if ( $namespaces )
+        {
+            foreach($namespaces as $namespace)
             {
-                $ctx = '__global__';
-                if ( isset($this->_classes[$ctx][$class]) && $class === $this->_classes[$ctx][$class][0] )
+                if ( 0 === strpos($class, $namespace[0]) )
                 {
-                    __importer_include_file__($this->_classes[$ctx][$class][2], true);
-                    return true;
-                }
-                
-                if ( !empty($this->_classes[$ctx]) )
-                {
-                    foreach($this->_classes[$ctx] as $id=>$def)
+                    $file = $namespace[1] . $logicalPathPsr0;
+                    if ( file_exists($file) )
                     {
-                        if ( $class === $def[0] )
-                        {
-                            __importer_include_file__($def[2], true);
-                            return true;
-                        }
+                        __importer_include_file__($file, true);
+                        return true;
                     }
                 }
             }
         }
-        else
+        
+        if ( '__global__' !== $ctx )
         {
-            $first = $class[0];
-            // Psr-4 lookup
-            $logicalPathPsr4 = strtr($class, '\\', DIRECTORY_SEPARATOR) . '.php';
-            // Psr-0 lookup
-            if (false !== $pos = strrpos($class, '\\'))
-            {
-                // namespaced class name
-                $logicalPathPsr0 = substr($logicalPathPsr4, 0, $pos + 1).strtr(substr($logicalPathPsr4, $pos + 1), '_', DIRECTORY_SEPARATOR);
-            }
-            else
-            {
-                // PEAR-like class name
-                $logicalPathPsr0 = strtr($class, '_', DIRECTORY_SEPARATOR) . '.php';
-            }
-            $namespaces = !empty($this->_namespaces[$ctx][$first]) ? $this->_namespaces[$ctx][$first] : null;
+            // if ctx different from global, try global ctx also
+            // Psr-4
+            $namespaces = !empty($this->_namespaces['__global__'][$first]) ? $this->_namespaces['__global__'][$first] : null;
             if ( $namespaces )
             {
                 foreach($namespaces as $namespace)
                 {
                     if ( 0 === strpos($class, $namespace[0]) )
                     {
-                        // psr-4
                         $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
                         if ( file_exists($file) )
                         {
                             __importer_include_file__($file, true);
                             return true;
                         }
-                        // psr-0
+                    }
+                }
+            }
+            // Psr-0
+            $namespaces = !empty($this->_namespaces0['__global__'][$first]) ? $this->_namespaces0['__global__'][$first] : null;
+            if ( $namespaces )
+            {
+                foreach($namespaces as $namespace)
+                {
+                    if ( 0 === strpos($class, $namespace[0]) )
+                    {
                         $file = $namespace[1] . $logicalPathPsr0;
                         if ( file_exists($file) )
                         {
@@ -751,47 +797,18 @@ class Importer
                     }
                 }
             }
-            
-            if ( '__global__' !== $ctx )
-            {
-                $ctx = '__global__';
-                $namespaces = !empty($this->_namespaces[$ctx][$first]) ? $this->_namespaces[$ctx][$first] : null;
-                if ( $namespaces )
-                {
-                    foreach($namespaces as $namespace)
-                    {
-                        if ( 0 === strpos($class, $namespace[0]) )
-                        {
-                            // psr-4
-                            $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
-                            if ( file_exists($file) )
-                            {
-                                __importer_include_file__($file, true);
-                                return true;
-                            }
-                            // psr-0
-                            $file = $namespace[1] . $logicalPathPsr0;
-                            if ( file_exists($file) )
-                            {
-                                __importer_include_file__($file, true);
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
     
     public function register_autoload( $prepend=false )
     {
-        spl_autoload_register(array($this, '_autoload_'), true, $prepend);
+        spl_autoload_register(array($this, '__autoload__'), true, $prepend);
         return $this;
     }
     
     public function unregister_autoload( )
     {
-        spl_autoload_unregister(array($this, '_autoload_'));
+        spl_autoload_unregister(array($this, '__autoload__'));
         return $this;
     }
 }
