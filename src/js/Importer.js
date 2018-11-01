@@ -2,7 +2,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 1.1.0
+*  @version 1.1.1
 *  https://github.com/foo123/Importer
 **/
 !function( root, name, factory ){
@@ -786,7 +786,7 @@ Importer = function Importer( base, base_url ) {
     self._cache = { };
 };
 
-Importer.VERSION = '1.1.0';
+Importer.VERSION = '1.1.1';
 Importer.BASE = './';
 Importer.path_join = path_join;
 Importer.join_path = join_path;

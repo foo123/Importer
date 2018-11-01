@@ -3,7 +3,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 1.1.0
+*  @version 1.1.1
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer', false) )
@@ -19,7 +19,7 @@ function __importer_include_file__( $file, $require=true )
 
 class Importer
 {
-    const VERSION = '1.1.0';
+    const VERSION = '1.1.1';
 
     const D_S = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -27,7 +27,7 @@ class Importer
     const PROTOCOL_RE = '#PROTOCOL#';
     
     public static $BASE = './';
-    private static $DS = '/';
+    protected static $DS = '/';
     
     // simulate python's "startswith" string method
     public static function startsWith( $str, $pre, $pos=0 ) 
@@ -117,14 +117,14 @@ class Importer
         return implode(' ', $out);
     }
     
-    private $base = null;
-    private $base_url = null;
-    private $_namespaces = null;
-    private $_namespaces0 = null;
-    private $_classmap = null;
-    private $_classes = null;
-    private $_assets = null;
-    private $_hooks = null;
+    protected $base = null;
+    protected $base_url = null;
+    protected $_namespaces = null;
+    protected $_namespaces0 = null;
+    protected $_classmap = null;
+    protected $_classes = null;
+    protected $_assets = null;
+    protected $_hooks = null;
     
     public static function _( $base='', $base_url='' )
     {
@@ -263,7 +263,7 @@ class Importer
         if ( null == $ctx ) $ctx = '__global__';
         if ( !empty($ctx) && is_array( $defs ) && !empty( $defs ) )
         {
-            if ( ('psr-0' ===$what) || ('namespaces0' === $what) )
+            if ( ('psr-0' === $what) || ('namespaces0' === $what) )
             {
                 if ( !isset($this->_namespaces0[$ctx]) ) $this->_namespaces0[$ctx] = array();
                 foreach($defs as $namespace=>$path)
@@ -271,7 +271,7 @@ class Importer
                     $first = $namespace[0];
                     if ( !isset($this->_namespaces0[$ctx][$first]) )
                         $this->_namespaces0[$ctx][$first] = array();
-                    if ( '\\' !== substr($namespace, -1) ) $namespace .= '\\';
+                    //if ( '\\' !== substr($namespace, -1) ) $namespace .= '\\';
                     $path = rtrim($this->path($path), '/\\') . DIRECTORY_SEPARATOR;
                     $this->_namespaces0[$ctx][$first][] = array($namespace, $path);
                 }
@@ -345,7 +345,7 @@ class Importer
         return $this;
     }
     
-    private function import_class( $id, $ctx='__global__', $require=true )
+    protected function import_class( $id, $ctx='__global__', $require=true )
     {
         if ( null == $ctx ) $ctx = '__global__';
         $queue = array( $id );
@@ -415,7 +415,7 @@ class Importer
         return $this;
     }
     
-    private function import_asset( $id, $ctx='__global__' )
+    protected function import_asset( $id, $ctx='__global__' )
     {
         if ( null == $ctx ) $ctx = '__global__';
         $out = array( );
@@ -713,18 +713,6 @@ class Importer
         $first = $class[0];
         // Psr-4 lookup
         $logicalPathPsr4 = strtr($class, '\\', DIRECTORY_SEPARATOR) . '.php';
-        // Psr-0 lookup
-        if ( false !== ($pos=strrpos($class, '\\')) )
-        {
-            // namespaced class name
-            $logicalPathPsr0 = substr($logicalPathPsr4, 0, $pos + 1).strtr(substr($logicalPathPsr4, $pos + 1), '_', DIRECTORY_SEPARATOR);
-        }
-        else
-        {
-            // PEAR-like class name
-            $logicalPathPsr0 = strtr($class, '_', DIRECTORY_SEPARATOR) . '.php';
-        }
-        
         // Psr-4
         $namespaces = !empty($this->_namespaces[$ctx][$first]) ? $this->_namespaces[$ctx][$first] : null;
         if ( $namespaces )
@@ -741,6 +729,17 @@ class Importer
                     }
                 }
             }
+        }
+        // Psr-0 lookup
+        if ( false !== ($pos=strrpos($class, '\\')) )
+        {
+            // namespaced class name
+            $logicalPathPsr0 = substr($logicalPathPsr4, 0, $pos + 1).strtr(substr($logicalPathPsr4, $pos + 1), '_', DIRECTORY_SEPARATOR);
+        }
+        else
+        {
+            // PEAR-like class name
+            $logicalPathPsr0 = strtr($class, '_', DIRECTORY_SEPARATOR) . '.php';
         }
         // Psr-0
         $namespaces = !empty($this->_namespaces0[$ctx][$first]) ? $this->_namespaces0[$ctx][$first] : null;
