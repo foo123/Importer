@@ -125,6 +125,7 @@ class Importer
     protected $_classes = null;
     protected $_assets = null;
     protected $_hooks = null;
+    protected $_autoloader = 0;
     
     public static function _( $base='', $base_url='' )
     {
@@ -139,6 +140,7 @@ class Importer
         $this->_classes = array( '__global__'=>array( ) );
         $this->_assets = array( '__global__'=>array( ) );
         $this->_hooks = array( '__global__'=>array( ) );
+        $this->_autoloader = 0;
         $this->base = '';
         $this->base_url = '';
         $this->base_path( $base, $base_url );
@@ -801,13 +803,28 @@ class Importer
     
     public function register_autoload( $prepend=false )
     {
-        spl_autoload_register(array($this, '__autoload__'), true, $prepend);
+        if ( 1 > $this->_autoloader )
+        {
+            if ( version_compare(PHP_VERSION, '5.3.0', '>=') )
+            {
+                spl_autoload_register(array($this, '__autoload__'), true, $prepend);
+            }
+            else
+            {
+                spl_autoload_register(array($this, '__autoload__'));
+            }
+            $this->_autoloader++;
+        }
         return $this;
     }
     
     public function unregister_autoload( )
     {
-        spl_autoload_unregister(array($this, '__autoload__'));
+        if ( 0 < $this->_autoloader )
+        {
+            spl_autoload_unregister(array($this, '__autoload__'));
+            $this->_autoloader--;
+        }
         return $this;
     }
 }

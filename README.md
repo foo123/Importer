@@ -1,6 +1,6 @@
 # Importer
 
-Importer, a simple &amp; flexible loader manager for namespaces, classes &amp; assets with dependencies for PHP, Python, Node/XPCOM/JS
+Importer, a simple &amp; flexible loader manager for namespaces (psr-4, psr-0), classes &amp; assets with dependencies for PHP, Python, Node/XPCOM/JS
 
 ![Importer](/importer.jpg)
 
