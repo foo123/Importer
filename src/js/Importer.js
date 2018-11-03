@@ -780,6 +780,7 @@ Importer = function Importer( base, base_url ) {
     self.base = '';
     self.base_url = '';
     self.base_path( base, base_url );
+    self._classmap = { '__global__':{} };
     self._classes = { '__global__':{} };
     self._assets = { '__global__':{} };
     self._hooks = { '__global__':{} };
@@ -798,6 +799,7 @@ Importer[PROTO] = {
     
     ,base: null
     ,base_url: null
+    ,_classmap: null
     ,_classes: null
     ,_assets: null
     ,_hooks: null
@@ -805,6 +807,7 @@ Importer[PROTO] = {
     
     ,dispose: function( ) {
         var self = this;
+        self._classmap = null;
         self._classes = null;
         self._assets = null;
         self._hooks = null;
@@ -916,9 +919,10 @@ Importer[PROTO] = {
     }
     
     ,register: function( what, defs, ctx ) {
-        var self = this, classes = self._classes, assets = self._assets,
+        var self = this, classes = self._classes, classmap = self._classmap, assets = self._assets,
             i, l, classname, def, id, path, deps, props, type, asset;
         if ( null == ctx ) ctx = '__global__';
+        what = String(what).toLowerCase();
         if ( ctx && is_array( defs ) && defs.length )
         {
             if ( !is_array( defs[0] ) ) defs = [defs]; // make array of arrays
@@ -933,14 +937,17 @@ Importer[PROTO] = {
                     if ( !empty( classname ) && !empty( id ) && !empty( path ) ) 
                     {
                         if ( !HAS.call(classes,ctx) ) classes[ctx] = {};
+                        if ( !HAS.call(classmap,ctx) ) classmap[ctx] = {};
+                        path = self.path( path );
                         classes[ctx][ id ] = [
                             /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
                             classname, 
                             id, 
-                            self.path( path ), 
+                            path, 
                             array(deps), 
                             false
                         ];
+                        classmap[ctx][ classname ] = [path, id];
                     }
                 }
             }

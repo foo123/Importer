@@ -263,6 +263,7 @@ class Importer
     public function register( $what, $defs, $ctx='__global__' )
     {
         if ( null == $ctx ) $ctx = '__global__';
+        $what = strtolower((string)$what);
         if ( !empty($ctx) && is_array( $defs ) && !empty( $defs ) )
         {
             if ( ('psr-0' === $what) || ('namespaces0' === $what) )
@@ -274,7 +275,7 @@ class Importer
                     if ( !isset($this->_namespaces0[$ctx][$first]) )
                         $this->_namespaces0[$ctx][$first] = array();
                     //if ( '\\' !== substr($namespace, -1) ) $namespace .= '\\';
-                    $path = rtrim($this->path($path), '/\\') . DIRECTORY_SEPARATOR;
+                    $path = is_callable($path) ? $path : (rtrim($this->path($path), '/\\') . DIRECTORY_SEPARATOR);
                     $this->_namespaces0[$ctx][$first][] = array($namespace, $path);
                 }
             }
@@ -287,7 +288,7 @@ class Importer
                     if ( !isset($this->_namespaces[$ctx][$first]) )
                         $this->_namespaces[$ctx][$first] = array();
                     if ( '\\' !== substr($namespace, -1) ) $namespace .= '\\';
-                    $path = rtrim($this->path($path), '/\\') . DIRECTORY_SEPARATOR;
+                    $path = is_callable($path) ? $path : (rtrim($this->path($path), '/\\') . DIRECTORY_SEPARATOR);
                     $this->_namespaces[$ctx][$first][] = array($namespace, $path);
                 }
             }
@@ -357,7 +358,7 @@ class Importer
             $ctx2 = isset( $this->_classes[$ctx][$id] ) ? $ctx : '__global__';
             if ( isset( $this->_classes[$ctx2][$id] ) && !$this->_classes[$ctx2][$id][4] )
             {
-                if ( !class_exists( $this->_classes[$ctx2][$id][0], false ) )
+                if ( !class_exists( $this->_classes[$ctx2][$id][0], false ) && !interface_exists( $this->_classes[$ctx2][$id][0], false ) )
                 {
                     $deps = $this->_classes[$ctx2][$id][3];
                     if ( !empty( $deps ) )
@@ -723,11 +724,19 @@ class Importer
             {
                 if ( 0 === strpos($class, $namespace[0]) )
                 {
-                    $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
-                    if ( file_exists($file) )
+                    if ( is_callable($namespace[1]) )
                     {
-                        __importer_include_file__($file, true);
-                        return true;
+                        $ret = call_user_func($namespace[1], $class);
+                        if ( true === $ret || class_exists($class, false) || interface_exists($class, false) ) return true;
+                    }
+                    else
+                    {
+                        $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
+                        if ( file_exists($file) )
+                        {
+                            __importer_include_file__($file, true);
+                            return true;
+                        }
                     }
                 }
             }
@@ -751,11 +760,19 @@ class Importer
             {
                 if ( 0 === strpos($class, $namespace[0]) )
                 {
-                    $file = $namespace[1] . $logicalPathPsr0;
-                    if ( file_exists($file) )
+                    if ( is_callable($namespace[1]) )
                     {
-                        __importer_include_file__($file, true);
-                        return true;
+                        $ret = call_user_func($namespace[1], $class);
+                        if ( true === $ret || class_exists($class, false) || interface_exists($class, false) ) return true;
+                    }
+                    else
+                    {
+                        $file = $namespace[1] . $logicalPathPsr0;
+                        if ( file_exists($file) )
+                        {
+                            __importer_include_file__($file, true);
+                            return true;
+                        }
                     }
                 }
             }
@@ -772,11 +789,19 @@ class Importer
                 {
                     if ( 0 === strpos($class, $namespace[0]) )
                     {
-                        $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
-                        if ( file_exists($file) )
+                        if ( is_callable($namespace[1]) )
                         {
-                            __importer_include_file__($file, true);
-                            return true;
+                            $ret = call_user_func($namespace[1], $class);
+                            if ( true === $ret || class_exists($class, false) || interface_exists($class, false) ) return true;
+                        }
+                        else
+                        {
+                            $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
+                            if ( file_exists($file) )
+                            {
+                                __importer_include_file__($file, true);
+                                return true;
+                            }
                         }
                     }
                 }
@@ -789,11 +814,19 @@ class Importer
                 {
                     if ( 0 === strpos($class, $namespace[0]) )
                     {
-                        $file = $namespace[1] . $logicalPathPsr0;
-                        if ( file_exists($file) )
+                        if ( is_callable($namespace[1]) )
                         {
-                            __importer_include_file__($file, true);
-                            return true;
+                            $ret = call_user_func($namespace[1], $class);
+                            if ( true === $ret || class_exists($class, false) || interface_exists($class, false) ) return true;
+                        }
+                        else
+                        {
+                            $file = $namespace[1] . $logicalPathPsr0;
+                            if ( file_exists($file) )
+                            {
+                                __importer_include_file__($file, true);
+                                return true;
+                            }
                         }
                     }
                 }
