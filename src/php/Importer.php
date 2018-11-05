@@ -358,7 +358,12 @@ class Importer
             $ctx2 = isset( $this->_classes[$ctx][$id] ) ? $ctx : '__global__';
             if ( isset( $this->_classes[$ctx2][$id] ) && !$this->_classes[$ctx2][$id][4] )
             {
-                if ( !class_exists( $this->_classes[$ctx2][$id][0], false ) && !interface_exists( $this->_classes[$ctx2][$id][0], false ) )
+                $classname = $this->_classes[$ctx2][$id][0];
+                $loaded = class_exists( $classname, false ) || interface_exists( $classname, false );
+                if ( !$loaded && version_compare(PHP_VERSION, '5.4.0', '>=') )
+                    $loaded = $loaded || trait_exists( $classname, false );
+                
+                if ( !$loaded )
                 {
                     $deps = $this->_classes[$ctx2][$id][3];
                     if ( !empty( $deps ) )
@@ -727,7 +732,10 @@ class Importer
                     if ( is_callable($namespace[1]) )
                     {
                         $ret = call_user_func($namespace[1], $class);
-                        if ( true === $ret || class_exists($class, false) || interface_exists($class, false) ) return true;
+                        $loaded = true === $ret || class_exists( $class, false ) || interface_exists( $class, false );
+                        if ( !$loaded && version_compare(PHP_VERSION, '5.4.0', '>=') )
+                            $loaded = $loaded || trait_exists( $class, false );
+                        if ( $loaded ) return true;
                     }
                     else
                     {
@@ -763,7 +771,10 @@ class Importer
                     if ( is_callable($namespace[1]) )
                     {
                         $ret = call_user_func($namespace[1], $class);
-                        if ( true === $ret || class_exists($class, false) || interface_exists($class, false) ) return true;
+                        $loaded = true === $ret || class_exists( $class, false ) || interface_exists( $class, false );
+                        if ( !$loaded && version_compare(PHP_VERSION, '5.4.0', '>=') )
+                            $loaded = $loaded || trait_exists( $class, false );
+                        if ( $loaded ) return true;
                     }
                     else
                     {
@@ -792,7 +803,10 @@ class Importer
                         if ( is_callable($namespace[1]) )
                         {
                             $ret = call_user_func($namespace[1], $class);
-                            if ( true === $ret || class_exists($class, false) || interface_exists($class, false) ) return true;
+                            $loaded = true === $ret || class_exists( $class, false ) || interface_exists( $class, false );
+                            if ( !$loaded && version_compare(PHP_VERSION, '5.4.0', '>=') )
+                                $loaded = $loaded || trait_exists( $class, false );
+                            if ( $loaded ) return true;
                         }
                         else
                         {
@@ -817,7 +831,10 @@ class Importer
                         if ( is_callable($namespace[1]) )
                         {
                             $ret = call_user_func($namespace[1], $class);
-                            if ( true === $ret || class_exists($class, false) || interface_exists($class, false) ) return true;
+                            $loaded = true === $ret || class_exists( $class, false ) || interface_exists( $class, false );
+                            if ( !$loaded && version_compare(PHP_VERSION, '5.4.0', '>=') )
+                                $loaded = $loaded || trait_exists( $class, false );
+                            if ( $loaded ) return true;
                         }
                         else
                         {
