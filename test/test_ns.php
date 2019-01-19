@@ -14,6 +14,9 @@ $importer = Importer::_( dirname(__FILE__), 'http://_mygit/Importer/test/' )
         array('Test1',  'Test1', './classes/Test1.php')
     ))
     ->register_autoload( )
+    ->one('import-class-Bar\\FooClass', function($imp, $id, $class, $path){
+        print_r(func_get_args());
+    })
 ;
 
 

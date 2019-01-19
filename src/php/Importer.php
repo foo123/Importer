@@ -3,7 +3,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 1.1.1
+*  @version 1.1.2
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer', false) )
@@ -19,7 +19,7 @@ function __importer_include_file__( $file, $require=true )
 
 class Importer
 {
-    const VERSION = '1.1.1';
+    const VERSION = '1.1.2';
 
     const D_S = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -694,6 +694,21 @@ class Importer
         return $this;
     }
     
+    private function triggerLoad($id, $class, $path, $ctx='__global__')
+    {
+        $this->trigger("import-class", array(
+            // $importer, $id,      $classname,   $path
+            $this, $id, $class, $path
+        ), $ctx);
+        
+        $this->trigger("import-class-{$id}", array(
+            // $importer, $id,      $classname,   $path
+            $this, $id, $class, $path
+        ), $ctx);
+        
+        return $this;
+    }
+    
     public function __autoload__( $class )
     {
         $ctx = '__global__'; // anyway to add custom context here??
@@ -703,6 +718,9 @@ class Importer
             // try to load a simple class from classmap first, if exists
             //$this->import_class($this->_classmap[$ctx][$class][1]);
             __importer_include_file__($this->_classmap[$ctx][$class][0], true);
+            // hook here
+            list($path, $id) = $this->_classmap[$ctx][$class];
+            $this->triggerLoad($id, $class, $path, $ctx);
             return true;
         }
         
@@ -714,6 +732,9 @@ class Importer
                 // try to load a simple class from classmap first, if exists
                 //$this->import_class($this->_classmap['__global__'][$class][1]);
                 __importer_include_file__($this->_classmap['__global__'][$class][0], true);
+                // hook here
+                list($path, $id) = $this->_classmap['__global__'][$class];
+                $this->triggerLoad($id, $class, $path, '__global__');
                 return true;
             }
         }
@@ -735,7 +756,11 @@ class Importer
                         $loaded = true === $ret || class_exists( $class, false ) || interface_exists( $class, false );
                         if ( !$loaded && version_compare(PHP_VERSION, '5.4.0', '>=') )
                             $loaded = $loaded || trait_exists( $class, false );
-                        if ( $loaded ) return true;
+                        if ( $loaded )
+                        {
+                            $this->triggerLoad($class, $class, '', $ctx);
+                            return true;
+                        }
                     }
                     else
                     {
@@ -743,6 +768,7 @@ class Importer
                         if ( file_exists($file) )
                         {
                             __importer_include_file__($file, true);
+                            $this->triggerLoad($class, $class, $file, $ctx);
                             return true;
                         }
                     }
@@ -774,7 +800,11 @@ class Importer
                         $loaded = true === $ret || class_exists( $class, false ) || interface_exists( $class, false );
                         if ( !$loaded && version_compare(PHP_VERSION, '5.4.0', '>=') )
                             $loaded = $loaded || trait_exists( $class, false );
-                        if ( $loaded ) return true;
+                        if ( $loaded )
+                        {
+                            $this->triggerLoad($class, $class, '', $ctx);
+                            return true;
+                        }
                     }
                     else
                     {
@@ -782,6 +812,7 @@ class Importer
                         if ( file_exists($file) )
                         {
                             __importer_include_file__($file, true);
+                            $this->triggerLoad($class, $class, $file, $ctx);
                             return true;
                         }
                     }
@@ -806,7 +837,11 @@ class Importer
                             $loaded = true === $ret || class_exists( $class, false ) || interface_exists( $class, false );
                             if ( !$loaded && version_compare(PHP_VERSION, '5.4.0', '>=') )
                                 $loaded = $loaded || trait_exists( $class, false );
-                            if ( $loaded ) return true;
+                            if ( $loaded )
+                            {
+                                $this->triggerLoad($class, $class, '', '__global__');
+                                return true;
+                            }
                         }
                         else
                         {
@@ -814,6 +849,7 @@ class Importer
                             if ( file_exists($file) )
                             {
                                 __importer_include_file__($file, true);
+                                $this->triggerLoad($class, $class, $file, '__global__');
                                 return true;
                             }
                         }
@@ -834,7 +870,11 @@ class Importer
                             $loaded = true === $ret || class_exists( $class, false ) || interface_exists( $class, false );
                             if ( !$loaded && version_compare(PHP_VERSION, '5.4.0', '>=') )
                                 $loaded = $loaded || trait_exists( $class, false );
-                            if ( $loaded ) return true;
+                            if ( $loaded )
+                            {
+                                $this->triggerLoad($class, $class, '', '__global__');
+                                return true;
+                            }
                         }
                         else
                         {
@@ -842,6 +882,7 @@ class Importer
                             if ( file_exists($file) )
                             {
                                 __importer_include_file__($file, true);
+                                $this->triggerLoad($class, $class, $file, '__global__');
                                 return true;
                             }
                         }

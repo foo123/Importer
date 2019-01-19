@@ -1,0 +1,126 @@
+Importer.VERSION = 1.1.2
+Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
+Foo\FooClass.php
+Bar\FooClass.php
+Array
+(
+    [0] => Importer Object
+        (
+            [base:protected] => C:\nikos\work\_nikos\open_source\git\nikos\Importer\test
+            [base_url:protected] => http://_mygit/Importer/test/
+            [_namespaces:protected] => Array
+                (
+                    [__global__] => Array
+                        (
+                            [F] => Array
+                                (
+                                    [0] => Array
+                                        (
+                                            [0] => Foo\
+                                            [1] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/namespaces/Foo\
+                                        )
+
+                                )
+
+                            [B] => Array
+                                (
+                                    [0] => Array
+                                        (
+                                            [0] => Bar\
+                                            [1] => C:\nikos\work\_nikos\open_source\git\nikos\Importer\test/namespaces/Bar\
+                                        )
+
+                                )
+
+                        )
+
+                )
+
+            [_namespaces0:protected] => Array
+                (
+                    [__global__] => Array
+                        (
+                        )
+
+                )
+
+            [_classmap:protected] => Array
+                (
+                    [__global__] => Array
+                        (
+                            [Test1] => Array
+                                (
+                                    [0] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test1.php
+                                    [1] => Test1
+                                )
+
+                        )
+
+                )
+
+            [_classes:protected] => Array
+                (
+                    [__global__] => Array
+                        (
+                            [Test1] => Array
+                                (
+                                    [0] => Test1
+                                    [1] => Test1
+                                    [2] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test1.php
+                                    [3] => Array
+                                        (
+                                        )
+
+                                    [4] => 
+                                )
+
+                        )
+
+                )
+
+            [_assets:protected] => Array
+                (
+                    [__global__] => Array
+                        (
+                        )
+
+                )
+
+            [_hooks:protected] => Array
+                (
+                    [__global__] => Array
+                        (
+                            [import-class-Bar\FooClass] => Array
+                                (
+                                    [0] => Array
+                                        (
+                                            [0] => Closure Object
+                                                (
+                                                    [parameter] => Array
+                                                        (
+                                                            [$imp] => <required>
+                                                            [$id] => <required>
+                                                            [$class] => <required>
+                                                            [$path] => <required>
+                                                        )
+
+                                                )
+
+                                            [1] => 1
+                                            [2] => 1
+                                        )
+
+                                )
+
+                        )
+
+                )
+
+            [_autoloader:protected] => 1
+        )
+
+    [1] => Bar\FooClass
+    [2] => Bar\FooClass
+    [3] => C:\nikos\work\_nikos\open_source\git\nikos\Importer\test/namespaces/Bar\FooClass.php
+)
+Test1.php
