@@ -3,7 +3,7 @@
 *  Importer
 *  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
 *
-*  @version 1.1.2
+*  @version 1.1.3
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer', false) )
@@ -19,7 +19,7 @@ function __importer_include_file__( $file, $require=true )
 
 class Importer
 {
-    const VERSION = '1.1.2';
+    const VERSION = '1.1.3';
 
     const D_S = '/';
     const DS_RE = '/\\/|\\\\/';
