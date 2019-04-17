@@ -1,15 +1,15 @@
 # -*- coding: UTF-8 -*-
 ##
 #  Importer
-#  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
+#  a simple loader manager for classes and assets with dependencies for PHP, Python, Node.js / Browser / XPCOM Javascript
 #
-#  @version 1.1.3
+#  @version 1.1.4
 #  https://github.com/foo123/Importer
 ##
 import os, re
 ## TODO, in progress ##
 class Importer:
-    VERSION = '1.1.3'
+    VERSION = '1.1.4'
     
     DS = '/'
     DS_RE = '/\\/|\\\\/'

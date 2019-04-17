@@ -1,19 +1,23 @@
-Importer.VERSION = 0.3.7
+Importer.VERSION = 1.1.4
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\js
 Test1.js
 Test2.js
 Callback
-{ '0': 
+[Arguments] {
+  '0':
    Importer {
-     base: 'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test',
+     base:
+      'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test',
      base_url: 'http://_mygit/Importer/test/',
+     _classmap: { __global__: [Object], 'my-ctx': [Object] },
      _classes: { __global__: [Object], 'my-ctx': [Object] },
      _assets: { __global__: [Object], 'my-ctx': [Object] },
      _hooks: { __global__: {}, 'my-ctx': [Object] },
      _cache: {} },
   '1': 'Test2',
   '2': 'Test2',
-  '3': 'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test\\classes\\Test2.js',
+  '3':
+   'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test\\classes\\Test2.js',
   '4': { Test2: [Function: Test2] } }
 <link id="importer-style-asset1" href="http://_mygit/Importer/test/assets/asset1.css" rel="stylesheet" type="text/css" media="all" />
 <link id="importer-style-asset2" href="http://_mygit/Importer/test/assets/asset2.css" rel="stylesheet" type="text/css" media="all" />

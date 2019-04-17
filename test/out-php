@@ -1,4 +1,4 @@
-Importer.VERSION = 1.0.0
+Importer.VERSION = 1.1.4
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
 Test1.php
 Test2.php
@@ -7,9 +7,49 @@ Array
 (
     [0] => Importer Object
         (
-            [base:Importer:private] => C:\nikos\work\_nikos\open_source\git\nikos\Importer\test
-            [base_url:Importer:private] => http://_mygit/Importer/test/
-            [_classes:Importer:private] => Array
+            [base:protected] => C:\nikos\work\_nikos\open_source\git\nikos\Importer\test
+            [base_url:protected] => http://_mygit/Importer/test/
+            [_namespaces:protected] => Array
+                (
+                    [__global__] => Array
+                        (
+                        )
+
+                )
+
+            [_namespaces0:protected] => Array
+                (
+                    [__global__] => Array
+                        (
+                        )
+
+                )
+
+            [_classmap:protected] => Array
+                (
+                    [__global__] => Array
+                        (
+                            [Test1] => Array
+                                (
+                                    [0] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test1.php
+                                    [1] => Test1
+                                )
+
+                        )
+
+                    [my-ctx] => Array
+                        (
+                            [Test2] => Array
+                                (
+                                    [0] => C:/nikos/work/_nikos/open_source/git/nikos/Importer/test/classes/Test2.php
+                                    [1] => Test2
+                                )
+
+                        )
+
+                )
+
+            [_classes:protected] => Array
                 (
                     [__global__] => Array
                         (
@@ -46,7 +86,7 @@ Array
 
                 )
 
-            [_assets:Importer:private] => Array
+            [_assets:protected] => Array
                 (
                     [__global__] => Array
                         (
@@ -116,7 +156,7 @@ Array
 
                 )
 
-            [_hooks:Importer:private] => Array
+            [_hooks:protected] => Array
                 (
                     [__global__] => Array
                         (
@@ -139,14 +179,8 @@ Array
 
                 )
 
-            [_namespaces] => Array
-                (
-                    [__global__] => Array
-                        (
-                        )
-
-                )
-
+            [_autoloader:protected] => 0
+            [_require:protected] => 
         )
 
     [1] => Test2

@@ -1,4 +1,4 @@
-Importer.VERSION = 1.1.2
+Importer.VERSION = 1.1.4
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
 Foo\FooClass.php
 Bar\FooClass.php
@@ -40,6 +40,16 @@ Array
                 (
                     [__global__] => Array
                         (
+                            [n] => Array
+                                (
+                                    [0] => Array
+                                        (
+                                            [0] => ns_
+                                            [1] => C:\nikos\work\_nikos\open_source\git\nikos\Importer\test/namespaces0\
+                                        )
+
+                                )
+
                         )
 
                 )
@@ -117,10 +127,15 @@ Array
                 )
 
             [_autoloader:protected] => 1
+            [_require:protected] => 
         )
 
     [1] => Bar\FooClass
     [2] => Bar\FooClass
     [3] => C:\nikos\work\_nikos\open_source\git\nikos\Importer\test/namespaces/Bar\FooClass.php
 )
+FooClass
+ns_Foo_FooClass.php
+ns_Bar_FooClass.php
+FooClass
 Test1.php

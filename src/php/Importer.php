@@ -1,81 +1,81 @@
 <?php
 /**
 *  Importer
-*  a simple loader manager for classes and assets with dependencies for PHP, Python, Node/XPCOM/JS
+*  a simple loader manager for classes and assets with dependencies for PHP, Python, Node.js / Browser / XPCOM Javascript
 *
-*  @version 1.1.3
+*  @version 1.1.4
 *  https://github.com/foo123/Importer
 **/
 if ( !class_exists('Importer', false) )
 {
-function __importer_include_file__( $file, $require=true )
+function __importer_include_file__( $file, $require=false )
 {
     // isolate included file from $this and other variables of importer class
-    if ( false===$require )
-        @include($file);
-    else
+    if ( $require )
         require_once($file);
+    else
+        @include($file);
 }
 
 class Importer
 {
-    const VERSION = '1.1.3';
+    const VERSION = '1.1.4';
 
     const D_S = '/';
     const DS_RE = '/\\/|\\\\/';
     const PROTOCOL = '://';
     const PROTOCOL_RE = '#PROTOCOL#';
-    
+
     public static $BASE = './';
     protected static $DS = '/';
-    
+
     // simulate python's "startswith" string method
-    public static function startsWith( $str, $pre, $pos=0 ) 
-    { 
+    public static function startsWith( $str, $pre, $pos=0 )
+    {
         return (bool)($pos === strpos($str, $pre, $pos));
-        //return (bool)($pre === substr($str, $pos, strlen($pre))); 
+        //return (bool)($pre === substr($str, $pos, strlen($pre)));
     }
-    
+
     public static function remove_protocol( $p )
     {
         return str_replace( self::PROTOCOL, self::PROTOCOL_RE, $p );
     }
-    
+
     public static function add_protocol( $p )
     {
         return str_replace( self::PROTOCOL_RE, self::PROTOCOL, $p );
     }
-    
+
     // adapted from https://github.com/JosephMoniz/php-path
-    public static function join_path( ) 
+    public static function join_path( )
     {
         $args = func_get_args( );
         $argslen = count( $args );
         $DS = self::$DS; //DIRECTORY_SEPARATOR;
-        
+
         if ( !$argslen )  return ".";
-        
+
         // take care of protocol, if exists
         $path = implode( $DS, array_map( array(__CLASS__, 'remove_protocol'), $args ) );
         $plen = strlen( $path );
-        
+
         if ( !$plen ) return ".";
-        
+
         $isAbsolute    = $path[0];
         $trailingSlash = $path[$plen - 1];
 
         $peices = array_values( array_filter( preg_split( self::DS_RE, $path ), 'strlen' ) );
-        
+
         $new_path = array( );
         $up = 0;
         $i = count($peices)-1;
         while ( $i >= 0 )
         {
             $last = $peices[ $i ];
-            if ( ".." === $last ) 
+            if ( ".." === $last )
             {
                 $up++;
-            } 
+            }
             elseif ( "." !== $last )
             {
                 if ( $up )  $up--;
@@ -83,22 +83,22 @@ class Importer
             }
             $i--;
         }
-        
+
         $path = implode( $DS, array_reverse($new_path) );
-        
-        if ( !$path && !$isAbsolute ) 
+
+        if ( !$path && !$isAbsolute )
         {
             $path = ".";
         }
 
-        if ( $path && $trailingSlash === $DS ) 
+        if ( $path && $trailingSlash === $DS )
         {
             $path .= $DS;
         }
 
         return ($isAbsolute === $DS ? $DS : "") . self::add_protocol( $path );
     }
-    
+
     public static function join_path_url( )
     {
         $_DS = self::$DS;
@@ -108,7 +108,7 @@ class Importer
         self::$DS = $_DS;
         return $ret;
     }
-    
+
     public static function attributes( $atts )
     {
         if ( empty($atts) ) return '';
@@ -116,7 +116,7 @@ class Importer
         foreach($atts as $k=>$v) $out[] = "{$k}=\"{$v}\"";
         return implode(' ', $out);
     }
-    
+
     protected $base = null;
     protected $base_url = null;
     protected $_namespaces = null;
@@ -126,12 +126,13 @@ class Importer
     protected $_assets = null;
     protected $_hooks = null;
     protected $_autoloader = 0;
-    
+    protected $_require = false;
+
     public static function _( $base='', $base_url='' )
     {
         return new self( $base, $base_url );
     }
-    
+
     public function __construct( $base='', $base_url='' )
     {
         $this->_namespaces = array( '__global__'=>array( ) );
@@ -141,18 +142,20 @@ class Importer
         $this->_assets = array( '__global__'=>array( ) );
         $this->_hooks = array( '__global__'=>array( ) );
         $this->_autoloader = 0;
+        $this->_require = false;
         $this->base = '';
         $this->base_url = '';
         $this->base_path( $base, $base_url );
     }
-    
+
     public function __destruct( )
     {
         $this->dispose( );
     }
-    
+
     public function dispose( )
     {
+        $this->unregister_autoload();
         $this->_namespaces = null;
         $this->_namespaces0 = null;
         $this->_classmap = null;
@@ -161,9 +164,17 @@ class Importer
         $this->_hooks = null;
         $this->base = null;
         $this->base_url = null;
+        $this->_require = null;
+        $this->_autoloader = null;
         return $this;
     }
-    
+
+    public function auto_require( $enable )
+    {
+        $this->_require = (bool)$enable;
+        return $this;
+    }
+
     public function on( $hook, $handler, $ctx='__global__', $once=false )
     {
         if ( !empty($hook) && !empty($ctx) && is_callable($handler) )
@@ -174,12 +185,12 @@ class Importer
         }
         return $this;
     }
-    
+
     public function one( $hook, $handler, $ctx='__global__' )
     {
         return $this->on( $hook, $handler, $ctx, true );
     }
-    
+
     public function off( $hook, $handler, $ctx='__global__' )
     {
         if ( !empty($hook) && !empty($ctx) && !empty($this->_hooks[$ctx][$hook]) )
@@ -200,7 +211,7 @@ class Importer
         }
         return $this;
     }
-    
+
     public function trigger( $hook, $args=array(), $ctx='__global__' )
     {
         if ( !empty($ctx) && !empty($hook) && !empty($this->_hooks[$ctx][$hook]) )
@@ -223,43 +234,43 @@ class Importer
         }
         return $this;
     }
-    
+
     public function base_path( $base='', $base_url='' )
     {
         if ( is_string( $base ) && !empty( $base ) ) $this->base = $base;
         elseif ( false === $base ) $this->base = '';
-        
+
         if ( is_string( $base_url ) && !empty( $base_url ) ) $this->base_url = $base_url;
         elseif ( false === $base_url ) $this->base_url = '';
-        
+
         return $this;
     }
-    
+
     public function get_path( $path, $base='', $url=false )
     {
         if ( empty($path) ) return $base;
-        
-        elseif ( !empty($base) && 
-            (self::startsWith($path, './') || 
-                self::startsWith($path, '../') || 
-                self::startsWith($path, '.\\') || 
+
+        elseif ( !empty($base) &&
+            (self::startsWith($path, './') ||
+                self::startsWith($path, '../') ||
+                self::startsWith($path, '.\\') ||
                 self::startsWith($path, '..\\'))
-        ) 
-            return true === $url ? self::join_path_url( $base, $path ) : self::join_path( $base, $path ); 
-        
+        )
+            return true === $url ? self::join_path_url( $base, $path ) : self::join_path( $base, $path );
+
         else return $path;
     }
-    
+
     public function path( $asset='' )
     {
         return $this->get_path( $asset, $this->base );
     }
-    
+
     public function path_url( $asset='' )
     {
         return $this->get_path( $asset, $this->base_url, true );
     }
-    
+
     public function register( $what, $defs, $ctx='__global__' )
     {
         if ( null == $ctx ) $ctx = '__global__';
@@ -301,15 +312,15 @@ class Importer
                 {
                     /* 0:class, 1:id, 2:path, 3:deps */
                     $classname = $def[0]; $id = $def[1]; $path = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
-                    if ( !empty( $classname ) && !empty( $id ) && !empty( $path ) ) 
+                    if ( !empty( $classname ) && !empty( $id ) && !empty( $path ) )
                     {
                         $path = $this->path( $path );
                         $this->_classes[$ctx][ $id ] = array(
                             /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
-                            $classname, 
-                            $id, 
-                            $path, 
-                            (array)$deps, 
+                            $classname,
+                            $id,
+                            $path,
+                            (array)$deps,
                             false
                         );
                         $this->_classmap[$ctx][ $classname ] = array($path, $id);
@@ -325,7 +336,7 @@ class Importer
                     /* 0:type, 1:id, 2:asset, 3:deps, 4:extra props */
                     $type = $def[0]; $id = $def[1]; $asset = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     $props = isset($def[4]) ? $def[4] : array();
-                    if ( !empty( $type ) && !empty( $id ) && !empty( $asset ) ) 
+                    if ( !empty( $type ) && !empty( $id ) && !empty( $asset ) )
                     {
                         $type = strtolower($type);
                         if ( 'scripts-composite' === $type || 'styles-composite' === $type || 'scripts-alt' === $type || 'styles-alt' === $type )
@@ -347,8 +358,8 @@ class Importer
         }
         return $this;
     }
-    
-    protected function import_class( $id, $ctx='__global__', $require=true )
+
+    protected function import_class( $id, $ctx='__global__', $require=null )
     {
         if ( null == $ctx ) $ctx = '__global__';
         $queue = array( $id );
@@ -362,7 +373,7 @@ class Importer
                 $loaded = class_exists( $classname, false ) || interface_exists( $classname, false );
                 if ( !$loaded && version_compare(PHP_VERSION, '5.4.0', '>=') )
                     $loaded = $loaded || trait_exists( $classname, false );
-                
+
                 if ( !$loaded )
                 {
                     $deps = $this->_classes[$ctx2][$id][3];
@@ -388,9 +399,9 @@ class Importer
                         array_shift( $queue );
                     }
                     $this->_classes[$ctx2][$id][4] = true; // loaded
-                    
-                    __importer_include_file__($this->_classes[$ctx2][$id][2], $require);
-                    
+
+                    __importer_include_file__($this->_classes[$ctx2][$id][2], null===$require ? $this->_require : (bool)$require);
+
                     // hook here
                     $this->trigger("import-class", array(
                         // $importer, $id,      $classname,   $path
@@ -422,7 +433,7 @@ class Importer
         }
         return $this;
     }
-    
+
     protected function import_asset( $id, $ctx='__global__' )
     {
         if ( null == $ctx ) $ctx = '__global__';
@@ -435,9 +446,9 @@ class Importer
             if ( isset( $this->_assets[$ctx2][$id] ) && $this->_assets[$ctx2][$id][5] && !$this->_assets[$ctx2][$id][6] ) // enqueued but not loaded yet
             {
                 $asset_def =& $this->_assets[$ctx2][$id];
-                $type = $asset_def[0]; 
-                $id = $asset_def[1];  
-                $asset = $asset_def[2]; 
+                $type = $asset_def[0];
+                $id = $asset_def[1];
+                $asset = $asset_def[2];
                 $deps = $asset_def[3];
                 $props = $asset_def[4];
                 if ( !empty( $deps ) )
@@ -463,7 +474,7 @@ class Importer
                     array_shift( $queue );
                 }
                 $asset_def[6] = true; // loaded
-                
+
                 // hook here
                 $ret = array();
                 $this->trigger("import-asset", array(
@@ -473,7 +484,7 @@ class Importer
                     // $importer, $id,      $type,   $asset
                     $this, $id, $type, $asset, &$ret
                 ), $ctx);
-                
+
                 if ( isset($ret['return']) )
                 {
                     $out[] = $ret['return'];
@@ -493,7 +504,7 @@ class Importer
                             'type'  => 'text/css',
                             'media' => 'all'
                         ), $props));
-                        
+
                         if ( $is_inlined )
                         {
                             $out[] = "<style id=\"importer-inline-style-{$asset_id}\" {$attributes}>{$asset[0]}</style>";
@@ -526,7 +537,7 @@ class Importer
                         $attributes = self::attributes(array_merge(array(
                             'type'  => 'text/javascript'
                         ), $props));
-                        
+
                         if ( $is_inlined )
                         {
                             $out[] = "<script id=\"importer-inline-script-{$asset_id}\" {$attributes}>/*<![CDATA[*/ {$asset[0]} /*]]>*/</script>";
@@ -559,7 +570,7 @@ class Importer
                         $attributes = self::attributes(array_merge(array(
                             'type'  => 'text/x-tpl'
                         ), $props));
-                        
+
                         $out[] = $is_inlined
                                 ? ("<script id=\"importer-inline-tpl-{$asset_id}\" {$attributes}>{$asset[0]}</script>")
                                 : ("<script id=\"importer-inline-tpl-{$asset_id}\" {$attributes}>".$this->get($asset)."</script>");
@@ -577,7 +588,7 @@ class Importer
         }
         return $out;
     }
-    
+
     public function assets( $type='scripts', $ctx='__global__' )
     {
         if ( null == $ctx ) $ctx = '__global__';
@@ -593,7 +604,7 @@ class Importer
         }
         return implode("\n", $out);
     }
-    
+
     public function enqueue( $type, $id, $asset_def=null, $ctx='__global__' )
     {
         $asset = null; $deps = null; $props = null;
@@ -611,7 +622,7 @@ class Importer
         if ( !empty($ctx) && !empty( $type ) && !empty( $id ) )
         {
             $ctx2 = isset( $this->_assets[$ctx][$id] ) ? $ctx : '__global__';
-            if ( isset( $this->_assets[$ctx2][$id] ) ) 
+            if ( isset( $this->_assets[$ctx2][$id] ) )
             {
                 $this->_assets[$ctx2][$id][5] = true; // enqueued
                 // hook here
@@ -623,7 +634,7 @@ class Importer
                     $this, $id, $type, $this->_assets[$ctx2][$id][2]
                 ), $ctx);
             }
-            elseif ( !empty( $asset ) ) 
+            elseif ( !empty( $asset ) )
             {
                 $this->register('assets', array($type, $id, $asset, $deps, $props), $ctx);
                 $this->_assets[$ctx][$id][5] = true; // enqueued
@@ -639,7 +650,7 @@ class Importer
         }
         return $this;
     }
-    
+
     public function get( $path, $opts=array() )
     {
         $default_value = isset($opts['default']) ? $opts['default'] : '';
@@ -661,7 +672,7 @@ class Importer
         }
         return $data;
     }
-    
+
     public function load( $classname, $class_def=null, $ctx='__global__' )
     {
         if ( is_array($classname) )
@@ -675,7 +686,7 @@ class Importer
         else
         {
             $path = null; $deps = null;
-            if ( is_array($class_def) ) 
+            if ( is_array($class_def) )
             {
                 $path = isset($class_def[0]) ? $class_def[0] : null;
                 $deps = isset($class_def[1]) ? $class_def[1] : null;
@@ -693,37 +704,37 @@ class Importer
         }
         return $this;
     }
-    
+
     private function triggerLoad($id, $class, $path, $ctx='__global__')
     {
         $this->trigger("import-class", array(
             // $importer, $id,      $classname,   $path
             $this, $id, $class, $path
         ), $ctx);
-        
+
         $this->trigger("import-class-{$id}", array(
             // $importer, $id,      $classname,   $path
             $this, $id, $class, $path
         ), $ctx);
-        
+
         return $this;
     }
-    
+
     public function __autoload__( $class )
     {
         $ctx = '__global__'; // anyway to add custom context here??
-        
+
         if ( isset($this->_classmap[$ctx][$class]) )
         {
             // try to load a simple class from classmap first, if exists
             //$this->import_class($this->_classmap[$ctx][$class][1]);
-            __importer_include_file__($this->_classmap[$ctx][$class][0], true);
+            __importer_include_file__($this->_classmap[$ctx][$class][0], $this->_require);
             // hook here
             list($path, $id) = $this->_classmap[$ctx][$class];
             $this->triggerLoad($id, $class, $path, $ctx);
             return true;
         }
-        
+
         if ( '__global__' !== $ctx )
         {
             // try also the global ctx if different
@@ -731,14 +742,14 @@ class Importer
             {
                 // try to load a simple class from classmap first, if exists
                 //$this->import_class($this->_classmap['__global__'][$class][1]);
-                __importer_include_file__($this->_classmap['__global__'][$class][0], true);
+                __importer_include_file__($this->_classmap['__global__'][$class][0], $this->_require);
                 // hook here
                 list($path, $id) = $this->_classmap['__global__'][$class];
                 $this->triggerLoad($id, $class, $path, '__global__');
                 return true;
             }
         }
-        
+
         $first = $class[0];
         // Psr-4 lookup
         $logicalPathPsr4 = strtr($class, '\\', DIRECTORY_SEPARATOR) . '.php';
@@ -767,7 +778,7 @@ class Importer
                         $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
                         if ( file_exists($file) )
                         {
-                            __importer_include_file__($file, true);
+                            __importer_include_file__($file, $this->_require);
                             $this->triggerLoad($class, $class, $file, $ctx);
                             return true;
                         }
@@ -811,7 +822,7 @@ class Importer
                         $file = $namespace[1] . $logicalPathPsr0;
                         if ( file_exists($file) )
                         {
-                            __importer_include_file__($file, true);
+                            __importer_include_file__($file, $this->_require);
                             $this->triggerLoad($class, $class, $file, $ctx);
                             return true;
                         }
@@ -819,7 +830,7 @@ class Importer
                 }
             }
         }
-        
+
         if ( '__global__' !== $ctx )
         {
             // if ctx different from global, try global ctx also
@@ -848,7 +859,7 @@ class Importer
                             $file = $namespace[1] . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($namespace[0]))) . '.php';
                             if ( file_exists($file) )
                             {
-                                __importer_include_file__($file, true);
+                                __importer_include_file__($file, $this->_require);
                                 $this->triggerLoad($class, $class, $file, '__global__');
                                 return true;
                             }
@@ -881,7 +892,7 @@ class Importer
                             $file = $namespace[1] . $logicalPathPsr0;
                             if ( file_exists($file) )
                             {
-                                __importer_include_file__($file, true);
+                                __importer_include_file__($file, $this->_require);
                                 $this->triggerLoad($class, $class, $file, '__global__');
                                 return true;
                             }
@@ -891,7 +902,7 @@ class Importer
             }
         }
     }
-    
+
     public function register_autoload( $prepend=false )
     {
         if ( 1 > $this->_autoloader )
@@ -908,7 +919,7 @@ class Importer
         }
         return $this;
     }
-    
+
     public function unregister_autoload( )
     {
         if ( 0 < $this->_autoloader )
