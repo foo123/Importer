@@ -1,24 +1,24 @@
-Importer.VERSION = 1.1.4
+Importer.VERSION = 1.1.5
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\js
 Test1.js
 Test2.js
 Callback
 [Arguments] {
-  '0':
-   Importer {
-     base:
-      'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test',
-     base_url: 'http://_mygit/Importer/test/',
-     _classmap: { __global__: [Object], 'my-ctx': [Object] },
-     _classes: { __global__: [Object], 'my-ctx': [Object] },
-     _assets: { __global__: [Object], 'my-ctx': [Object] },
-     _hooks: { __global__: {}, 'my-ctx': [Object] },
-     _cache: {} },
+  '0': Importer {
+    base: 'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test',
+    base_url: 'http://_mygit/Importer/test/',
+    _classmap: { __global__: [Object], 'my-ctx': [Object] },
+    _classes: { __global__: [Object], 'my-ctx': [Object] },
+    _assets: { __global__: [Object], 'my-ctx': [Object] },
+    _hooks: { __global__: {}, 'my-ctx': [Object] },
+    _cache: {}
+  },
   '1': 'Test2',
   '2': 'Test2',
-  '3':
-   'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test\\classes\\Test2.js',
-  '4': { Test2: [Function: Test2] } }
+  '3': 'C:\\nikos\\work\\_nikos\\open_source\\git\\nikos\\Importer\\test\\classes\\Test2.js',
+  '4': [Function: Test2]
+}
+Test2.js
 <link id="importer-style-asset1" href="http://_mygit/Importer/test/assets/asset1.css" rel="stylesheet" type="text/css" media="all" />
 <link id="importer-style-asset2" href="http://_mygit/Importer/test/assets/asset2.css" rel="stylesheet" type="text/css" media="all" />
 <style id="importer-inline-style-asset3" type="text/css" media="all">/* asset 3 */</style>
@@ -27,4 +27,4 @@ function Test1( )
     return 'Test1.js';    
 }
 console.log ('Test1.js');
-if ( "undefined" !== typeof module && "object" === typeof exports ) exports.Test1 = Test1;
+if ( "undefined" !== typeof module && module.exports ) module.exports = Test1;

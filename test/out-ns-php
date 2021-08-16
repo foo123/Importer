@@ -1,4 +1,4 @@
-Importer.VERSION = 1.1.4
+Importer.VERSION = 1.1.5
 Importer.BASE = C:\nikos\work\_nikos\open_source\git\nikos\Importer\src\php
 Foo\FooClass.php
 Bar\FooClass.php
