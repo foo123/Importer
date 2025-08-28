@@ -1,8 +1,8 @@
 /**
 *  Importer
-*  a simple loader manager for classes and assets with dependencies for PHP, Python, Javascript
+*  simple manager for classes and assets with dependencies for PHP, JavaScript, Python
 *
-*  @version 1.1.5
+*  @version 1.1.6
 *  https://github.com/foo123/Importer
 **/
 !function(root, name, factory){
@@ -20,7 +20,8 @@ else if (!(name in root)) /* Browser/WebWorker/.. */
     /* module factory */        function ModuleFactory__Importer(undef){
 "use strict";
 
-var PROTO = 'prototype', HAS = Object[PROTO].hasOwnProperty, ATTR = 'setAttribute', LOWER = 'toLowerCase',
+var PROTO = 'prototype', HAS = Object[PROTO].hasOwnProperty,
+    ATTR = 'setAttribute', LOWER = 'toLowerCase',
     toString = Object[PROTO].toString, map = Array[PROTO].map, KEYS = Object.keys,
     startsWith = String[PROTO].startsWith
             ? function(s, pre, pos){return s.startsWith(pre, pos||0);}
@@ -54,7 +55,13 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
     }
     : (isNode
     ? function import_module(name, path, scope) {
-        return require(path);
+        var module = null;
+        try {
+            module = require(path);
+        } catch (e) {
+            module = null;
+        }
+        return module;
     }
     : (isWebWorker
     ? function import_module(name, path, scope) {
@@ -65,9 +72,9 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
     XHR = function() {
     return window.XMLHttpRequest
         // code for IE7+, Firefox, Chrome, Opera, Safari
-        ? new XMLHttpRequest( )
+        ? (new XMLHttpRequest())
         // code for IE6, IE5
-        : new ActiveXObject('Microsoft.XMLHTTP') // or ActiveXObject("Msxml2.XMLHTTP"); ??
+        : (new ActiveXObject('Microsoft.XMLHTTP')) // or ActiveXObject("Msxml2.XMLHTTP"); ??
     ;
     },
 
@@ -103,10 +110,10 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         {
             var bstream = Cc['@mozilla.org/binaryinputstream;1'].createInstance(Ci.nsIBinaryInputStream);
             stream.init(file, -1, -1, false);
-            len = stream.available( );
-            bstream.setInputStream( stream );
-            bstream.readByteArray( len, data = new Uint8Array( len ) );
-            bstream.close( );
+            len = stream.available();
+            bstream.setInputStream(stream);
+            bstream.readByteArray(len, data = new Uint8Array(len));
+            bstream.close();
         }
         else
         {
@@ -117,11 +124,11 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
             do {
                 // read as much as we can and put it in str.value
                 read = cstream.readString(0xffffffff, str);
-                if ( null === data ) data = '';
+                if (null == data) data = '';
                 data += str.value;
             } while (0 != read);
             cstream.close(); // this closes stream
-            if (null === data) data = null != defval ? defval : '';
+            if (null == data) data = null != defval ? defval : '';
         }
         return data;
     }
@@ -139,12 +146,12 @@ var Scope = isXPCOM ? this : (isNode ? global : (isWebWorker ? this : window)),
         if ('binary' === enc)
         {
             // http://stackoverflow.com/questions/9855127/setting-xmlhttprequest-responsetype-forbidden-all-of-a-sudden
-            if (isWebWorker) xhr.responseType = 'arraybuffer';
+            /*if (isWebWorker)*/ xhr.responseType = 'arraybuffer';
         }
         else
         {
             // http://stackoverflow.com/questions/9855127/setting-xmlhttprequest-responsetype-forbidden-all-of-a-sudden
-            if (isWebWorker) xhr.responseType = 'text';
+            /*if (isWebWorker)*/ xhr.responseType = 'text';
             xhr.setRequestHeader('Content-Type', 'text/plain; charset='+enc+'');
             xhr.overrideMimeType('text/plain; charset='+enc+'');
         }
@@ -234,7 +241,7 @@ function load_deps(importer, scope, cache, ref, complete)
     // xpcom module / nodejs, require / webworker, importScripts
     if (isXPCOM || isNode || isWebWorker)
     {
-        for (i=0; i<dl; i++)
+        for (i=0; i<dl; ++i)
         {
             if (HAS.call(ref[i],'loaded'))
             {
@@ -242,34 +249,34 @@ function load_deps(importer, scope, cache, ref, complete)
                 // hook here
                 importer.trigger('import-class', [
                     //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[i]
                 ], ref[i].ctx).trigger('import-class-'+ref[i].id, [
                     //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[i]
                 ], ref[i].ctx);
             }
-            else if (HAS.call(cache,ref[i].ctx+'--'+ref[ i ].cache_id))
+            else if (HAS.call(cache,ref[i].ctx+'--'+ref[i].cache_id))
             {
-                loaded[i] = cache[ref[i].ctx+'--'+ref[ i ].cache_id];
+                loaded[i] = cache[ref[i].ctx+'--'+ref[i].cache_id];
             }
-            else if ('class' !== ref[ i ].type)
+            else if ('class' !== ref[i].type)
             {
-                loaded[i] = cache[ref[i].ctx+'--'+ref[ i ].cache_id ] = read_file( ref[ i ].path, isXPCOM ? 'UTF-8' : 'utf8');
+                loaded[i] = cache[ref[i].ctx+'--'+ref[i].cache_id] = read_file(ref[i].path, isXPCOM ? 'UTF-8' : 'utf8');
             }
-            else if (ref[ i ].name in scope)
+            else if (ref[i].name in scope)
             {
-                loaded[i] = scope[ref[ i ].name];
+                loaded[i] = scope[ref[i].name];
             }
             else
             {
-                loaded[i] = import_module(ref[ i ].name, ref[ i ].path, scope) || null;
+                loaded[i] = import_module(ref[i].name, ref[i].path, scope) || null;
                 // hook here
                 importer.trigger('import-class', [
                     //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[i]
                 ], ref[i].ctx).trigger('import-class-'+ref[i].id, [
                     //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[i]
                 ], ref[i].ctx);
             }
         }
@@ -291,7 +298,7 @@ function load_deps(importer, scope, cache, ref, complete)
                 else
                 {
                     read_file_async(path, 'utf8', function(data) {
-                        cache[ ctx+'--'+id ]  = data;
+                        cache[ctx+'--'+id] = data;
                         $$asset(type, data)[ATTR]('id', id);
                         next();
                     });
@@ -306,7 +313,7 @@ function load_deps(importer, scope, cache, ref, complete)
                 else
                 {
                     read_file_async(path, 'utf8', function(data) {
-                        cache[ ctx+'--'+id ]  = data;
+                        cache[ctx+'--'+id]  = data;
                         if ('template' === type && !$$(id))
                             $$asset('tpl', data)[ATTR]('id', id);
                         next();
@@ -342,32 +349,32 @@ function load_deps(importer, scope, cache, ref, complete)
         };
         next = function next() {
             var cached;
-            if (HAS.call(ref[i],'loaded') || (cached=HAS.call(cache,ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope))
+            if (HAS.call(ref[i],'loaded') || (cached=HAS.call(cache,ref[i].ctx+'--'+ref[i].cache_id)) || (ref[i].name in scope))
             {
-                loaded[i] = (HAS.call(ref[i],'loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
+                loaded[i] = (HAS.call(ref[i],'loaded') ? ref[i].loaded : (cached ? cache[ ref[i].ctx+'--'+ref[i].cache_id] : scope[ref[i].name])) || null;
 
                 // hook here
                 importer.trigger('import-class', [
                     //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ], ref[ i ].ctx).trigger('import-class-'+ref[i].id, [
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[i]
+                ], ref[i].ctx).trigger('import-class-'+ref[i].id, [
                     //          this,     id,        classname,   path,        reference
-                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[ i ]
-                ], ref[ i ].ctx);
+                    importer, ref[i].id, ref[i].name, ref[i].path, loaded[i]
+                ], ref[i].ctx);
 
                 if (++i >= dl)
                 {
                     complete.apply(scope, loaded);
                 }
-                else if (HAS.call(ref[i],'loaded') || (cached=HAS.call(cache,ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope))
+                else if (HAS.call(ref[i],'loaded') || (cached=HAS.call(cache,ref[i].ctx+'--'+ref[i].cache_id)) || (ref[i].name in scope))
                 {
-                    loaded[i] = (HAS.call(ref[i],'loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
+                    loaded[i] = (HAS.call(ref[i],'loaded') ? ref[i].loaded : (cached ? cache[ref[i].ctx+'--'+ref[i].cache_id] : scope[ref[i].name])) || null;
                     next();
                 }
                 else
                 {
-                    scope[ref[ i ].name] = null;
-                    load(ref[ i ].cache_id, ref[ i ].ctx, ref[ i ].type, ref[ i ].path, next);
+                    scope[ref[i].name] = null;
+                    load(ref[i].cache_id, ref[i].ctx, ref[i].type, ref[i].path, next);
                 }
             }
             else if (++t < 4)
@@ -377,24 +384,24 @@ function load_deps(importer, scope, cache, ref, complete)
             else
             {
                 t = 0;
-                scope[ref[ i ].name] = null;
+                scope[ref[i].name] = null;
                 // hook here
                 importer.trigger('import-class', [
                     //          this,     id,        classname,   path,        reference
                     importer, ref[i].id, ref[i].name, ref[i].path, null
-                ], ref[ i ].ctx).trigger('import-class-'+ref[i].id, [
+                ], ref[i].ctx).trigger('import-class-'+ref[i].id, [
                     //          this,     id,        classname,   path,        reference
                     importer, ref[i].id, ref[i].name, ref[i].path, null
-                ], ref[ i ].ctx);
+                ], ref[i].ctx);
                 i++; next();
             }
         };
-        while (i < dl && (HAS.call(ref[i],'loaded') || (cached=HAS.call(cache,ref[ i ].ctx+'--'+ref[ i ].cache_id)) || (ref[ i ].name in scope)))
+        while (i < dl && (HAS.call(ref[i],'loaded') || (cached=HAS.call(cache,ref[i].ctx+'--'+ref[i].cache_id)) || (ref[i].name in scope)))
         {
-            loaded[i] = (HAS.call(ref[i],'loaded') ? ref[i].loaded : (cached ? cache[ ref[ i ].ctx+'--'+ref[ i ].cache_id ] : scope[ ref[ i ].name ])) || null;
+            loaded[i] = (HAS.call(ref[i],'loaded') ? ref[i].loaded : (cached ? cache[ref[i].ctx+'--'+ref[i].cache_id] : scope[ref[i].name])) || null;
             i++;
         }
-        if (i < dl) load(ref[ i ].cache_id, ref[ i ].ctx, ref[ i ].type, ref[ i ].path, next);
+        if (i < dl) load(ref[i].cache_id, ref[i].ctx, ref[i].type, ref[i].path, next);
         else complete.apply(scope, loaded);
     }
 }
@@ -499,15 +506,15 @@ function is_callable(o)
 }
 function is_string(o)
 {
-    return o instanceof String || '[object String]' === toString.call(o);
+    return (o instanceof String) || ('[object String]' === toString.call(o));
 }
 function is_array(o)
 {
-    return o instanceof Array || '[object Array]' === toString.call(o);
+    return (o instanceof Array) || ('[object Array]' === toString.call(o));
 }
 function is_obj(o)
 {
-    return o instanceof Object || '[object Object]' === toString.call(o);
+    return (o instanceof Object) || ('[object Object]' === toString.call(o));
 }
 function empty(o)
 {
@@ -522,7 +529,7 @@ function array(o)
 function merge(o1, o2)
 {
     var k = KEYS(o2), i, l;
-    for (i=0,l=k.length; i<l; i++) o1[k[i]] = o2[k[i]];
+    for (i=0,l=k.length; i<l; ++i) o1[k[i]] = o2[k[i]];
     return o1;
 }
 function attributes(atts, node)
@@ -531,13 +538,13 @@ function attributes(atts, node)
     var k = KEYS(atts), i, l;
     if (node)
     {
-        for (i=0,l=k.length; i<l; i++) node[ATTR](k[i], true === atts[k[i]] ? k[i] : atts[k[i]]);
+        for (i=0,l=k.length; i<l; ++i) node[ATTR](k[i], true === atts[k[i]] ? k[i] : atts[k[i]]);
         return node;
     }
     else
     {
         var out = [];
-        for (i=0,l=k.length; i<l; i++) out.push(k[i]+(true === atts[k[i]] ? '' : '="'+atts[k[i]]+'"'));
+        for (i=0,l=k.length; i<l; ++i) out.push(k[i]+(true === atts[k[i]] ? '' : '="'+atts[k[i]]+'"'));
         return out.join(' ');
     }
 }
@@ -561,7 +568,7 @@ function $$css(style, css)
     var css_type = typeof css, n, index, declaration, selector, rules;
 
     // css rules object
-    if ('object' === css_type)
+    if (('object' === css_type) && (null != css_type))
     {
         index = 0;
         for (n in css)
@@ -580,7 +587,7 @@ function $$css(style, css)
                 style.sheet.addRule(selector, rules, index);
                 declaration.css = style.sheet.rules[index];
             }
-            index++;
+            ++index;
         }
     }
     // css literal string
@@ -636,12 +643,12 @@ function $$asset(type, src, unique, atts)
             {
                 // external script, only if not exists
                 links = $$tag('script');
-                for (i=links.length-1; i>=0; i--)
+                for (i=links.length-1; i>=0; --i)
                 {
-                    if (links[i].src && src === links[i].src)
+                    if (links[i].src && (src === links[i].src))
                     {
                         // found existing link
-                        link = links[ i ];
+                        link = links[i];
                         break;
                     }
                 }
@@ -693,12 +700,12 @@ function $$asset(type, src, unique, atts)
             {
                 // external stylesheet, only if not exists
                 links = $$tag('link');
-                for (i=links.length-1; i>=0; i--)
+                for (i=links.length-1; i>=0; --i)
                 {
                     if (src === links[i].href)
                     {
                         // found existing link
-                        link = links[ i ];
+                        link = links[i];
                         break;
                     }
                 }
@@ -781,7 +788,7 @@ function path_join()
     else if (isNode)
     {
         p = require('path');
-        full = p.join.apply( p, args );
+        full = p.join.apply(p, args);
     }
     /*else if ( isBrowser && !isWebWorker )
     {
@@ -819,17 +826,17 @@ function join_path()
     i = peices.length-1;
     while (i >= 0)
     {
-        last = peices[ i ];
+        last = peices[i];
         if ('..' === last)
         {
             up++;
         }
         else if ('.' !== last)
         {
-            if (up)  up--;
+            if (up)  --up;
             else new_path.push(peices[i]);
         }
-        i--;
+        --i;
     }
 
     path = new_path.reverse().join(ds);
@@ -869,7 +876,7 @@ Importer = function Importer(base, base_url) {
     self._cache = {};
 };
 
-Importer.VERSION = '1.1.5';
+Importer.VERSION = '1.1.6';
 Importer.BASE = './';
 Importer.path_join = path_join;
 Importer.join_path = join_path;
@@ -927,7 +934,7 @@ Importer[PROTO] = {
             else if (handler)
             {
                 hooks = self._hooks[ctx][hook];
-                for (i=hooks.length-1; i>=0; i--)
+                for (i=hooks.length-1; i>=0; --i)
                 {
                     if (handler === hooks[i][0])
                         hooks.splice(i, 1);
@@ -944,7 +951,7 @@ Importer[PROTO] = {
         {
             hooks = self._hooks[ctx][hook];
             args = args || [];
-            for (i=0; i<hooks.length; i++)
+            for (i=0; i<hooks.length; ++i)
             {
                 h = hooks[i];
                 if (h[1] && h[2]) continue;
@@ -953,7 +960,7 @@ Importer[PROTO] = {
                 if (false === ret) break;
             }
             // remove called oneoffs
-            for (i=hooks.length-1; i>=0; i--)
+            for (i=hooks.length-1; i>=0; --i)
             {
                 if (hooks[i][1] && hooks[i][2])
                     hooks.splice(i, 1);
@@ -1011,9 +1018,9 @@ Importer[PROTO] = {
 
             if ('classes' === what)
             {
-                for (i=0,l=defs.length; i<l; i++)
+                for (i=0,l=defs.length; i<l; ++i)
                 {
-                    def = defs[ i ];
+                    def = defs[i];
                     /* 0:class, 1:id, 2:path, 3:deps */
                     classname = def[0]; id = def[1]; path = def[2]; deps = def[3] ? def[3] : [];
                     if (!empty(classname) && !empty(id) && !empty(path))
@@ -1035,15 +1042,15 @@ Importer[PROTO] = {
             }
             else if ('assets' === what)
             {
-                for (i=0,l=defs.length; i<l; i++)
+                for (i=0,l=defs.length; i<l; ++i)
                 {
-                    def = defs[ i ];
+                    def = defs[i];
                     /* 0:type, 1:id, 2:asset, 3:deps, 4:props */
                     type = def[0]; id = def[1]; asset = def[2]; deps = def[3] ? def[3] : [];
                     props = def[4] ? def[4] : {};
                     if (!empty(type) && !empty(id) && !empty(asset))
                     {
-                        type = type[LOWER]( );
+                        type = type[LOWER]();
                         if ('scripts-composite' === type || 'styles-composite' === type || 'scripts-alt' === type || 'styles-alt' === type)
                         {
                             asset = array(asset);
@@ -1054,7 +1061,7 @@ Importer[PROTO] = {
                             asset = self.path_url(asset);
                         }
                         if (!HAS.call(assets,ctx)) assets[ctx] = {};
-                        assets[ctx][ id ] = [
+                        assets[ctx][id] = [
                             /* 0:type, 1:id, 2:asset, 3:deps, 4:props, 5:enqueued, 6:loaded */
                             type, id, asset, array(deps), props, false, false
                         ];
@@ -1079,11 +1086,11 @@ Importer[PROTO] = {
         else
         {
             exists = false;
-            to_load = [ ];
-            queue = [ id ];
+            to_load = [];
+            queue = [id];
             while (queue.length)
             {
-                id = queue[ 0 ];
+                id = queue[0];
                 ctx2 = HAS.call(classes,ctx) && HAS.call(classes[ctx],id) ? ctx : '__global__';
                 if (HAS.call(classes[ctx2],id) && !classes[ctx2][id][4])
                 {
@@ -1095,7 +1102,7 @@ Importer[PROTO] = {
                         {
                             needs_deps = false;
                             numdeps = deps.length;
-                            for (i=numdeps-1; i>=0; i--)
+                            for (i=numdeps-1; i>=0; --i)
                             {
                                 dep = deps[i];
                                 ctx3 = HAS.call(classes,ctx) && HAS.call(classes[ctx],dep) ? ctx : '__global__';
@@ -1152,7 +1159,7 @@ Importer[PROTO] = {
             {
                 load_deps(self, Scope, cache, to_load, function() {
                     var i, l, args = arguments;
-                    for (i=0,l=args.length; i<l; i++) cache[ ctx+'--'+to_load[ i ].cache_id ] = args[ i ];
+                    for (i=0,l=args.length; i<l; ++i) cache[ctx+'--'+to_load[i].cache_id] = args[i];
                     if (is_callable(complete)) complete.call(self, cache[ctx+'--'+cache_id]);
                 });
             }
@@ -1186,7 +1193,7 @@ Importer[PROTO] = {
                 {
                     needs_deps = false;
                     numdeps = deps.length;
-                    for (i=numdeps-1; i>=0; i--)
+                    for (i=numdeps-1; i>=0; --i)
                     {
                         dep = deps[i];
                         ctx3 = HAS.call(assets,ctx) && HAS.call(assets[ctx],dep) ? ctx : '__global__';
@@ -1244,7 +1251,7 @@ Importer[PROTO] = {
                             }
                             else if (is_composite)
                             {
-                                for (pi=0,pl=asset.length; pi<pl; pi++)
+                                for (pi=0,pl=asset.length; pi<pl; ++pi)
                                 {
                                     if (is_array(asset[pi]))
                                     {
@@ -1288,7 +1295,7 @@ Importer[PROTO] = {
                             }
                             else if (is_composite)
                             {
-                                for (pi=0,pl=asset.length; pi<pl; pi++)
+                                for (pi=0,pl=asset.length; pi<pl; ++pi)
                                 {
                                     if (is_array(asset[pi]))
                                     {
@@ -1382,7 +1389,7 @@ Importer[PROTO] = {
                             }
                             else if (is_composite)
                             {
-                                for (pi=0,pl=asset.length; pi<pl; pi++)
+                                for (pi=0,pl=asset.length; pi<pl; ++pi)
                                 {
                                     if (is_array(asset[pi]))
                                     {
@@ -1462,7 +1469,7 @@ Importer[PROTO] = {
                     if (deps && deps.length)
                     {
                         numdeps = deps.length;
-                        for (i=numdeps-1; i>=0; i--)
+                        for (i=numdeps-1; i>=0; --i)
                         {
                             dep = deps[i];
                             ctx3 = HAS.call(assets,ctx) && HAS.call(assets[ctx],dep) ? ctx : '__global__';
@@ -1504,14 +1511,14 @@ Importer[PROTO] = {
         }
         if (isBrowser)
         {
-            for (i=0,l=to_load.length; i<l; i++)
+            for (i=0,l=to_load.length; i<l; ++i)
                 self.import_asset(to_load[i], ctx);
             out = '';
         }
-        else //if ( isXPCOM || isNode || isWebWorker )
+        else //if (isXPCOM || isNode || isWebWorker)
         {
-            out = [ ];
-            for (i=0,l=to_load.length; i<l; i++)
+            out = [];
+            for (i=0,l=to_load.length; i<l; ++i)
                 out = out.concat(self.import_asset(to_load[i], ctx));
             out = out.join("\n");
         }
@@ -1604,8 +1611,8 @@ Importer[PROTO] = {
             loader = function loader(loaded) {
                 if (arguments.length)
                 {
-                    c[ i ] = loaded || null;
-                    i++;
+                    c[i] = loaded || null;
+                    ++i;
                 }
                 if (i < l) self.import_class(classname[i],  loader, ctx);
                 else if (is_callable(complete))

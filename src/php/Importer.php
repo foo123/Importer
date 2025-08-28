@@ -1,9 +1,9 @@
 <?php
 /**
 *  Importer
-*  a simple loader manager for classes and assets with dependencies for PHP, Python, Javascript
+*  simple manager for classes and assets with dependencies for PHP, JavaScript, Python
 *
-*  @version 1.1.5
+*  @version 1.1.6
 *  https://github.com/foo123/Importer
 **/
 if (!class_exists('Importer', false))
@@ -17,7 +17,7 @@ function __importer_include_file__($file, $require = false)
 
 class Importer
 {
-    const VERSION = '1.1.5';
+    const VERSION = '1.1.6';
 
     const D_S = '/';
     const DS_RE = '/\\/|\\\\/';
@@ -76,10 +76,10 @@ class Importer
             }
             elseif ("." !== $last)
             {
-                if ($up)  $up--;
-                else array_push($new_path, $peices[ $i ]);
+                if ($up)  --$up;
+                else array_push($new_path, $peices[$i]);
             }
-            $i--;
+            --$i;
         }
 
         $path = implode($DS, array_reverse($new_path));
@@ -200,7 +200,7 @@ class Importer
             elseif ($handler)
             {
                 $hooks =& $this->_hooks[$ctx][$hook];
-                for ($i=count($hooks)-1; $i>=0; $i--)
+                for ($i=count($hooks)-1; $i>=0; --$i)
                 {
                     if ($handler === $hooks[$i][0])
                         array_splice($hooks, $i, 1);
@@ -216,7 +216,7 @@ class Importer
         {
             $hooks =& $this->_hooks[$ctx][$hook];
             $args = (array)$args;
-            foreach ($hooks as $i=>&$h)
+            foreach ($hooks as $i => &$h)
             {
                 if ($h[1] && $h[2]) continue;
                 $h[2] = 1; // called;
@@ -224,7 +224,7 @@ class Importer
                 if (false === $ret) break;
             }
             // remove called oneoffs
-            for ($i=count($hooks)-1; $i>=0; $i--)
+            for ($i=count($hooks)-1; $i>=0; --$i)
             {
                 if ($hooks[$i][1] && $hooks[$i][2])
                     array_splice($hooks, $i, 1);
@@ -278,7 +278,7 @@ class Importer
             if (('psr-0' === $what) || ('namespaces0' === $what))
             {
                 if (!isset($this->_namespaces0[$ctx])) $this->_namespaces0[$ctx] = array();
-                foreach ($defs as $namespace=>$path)
+                foreach ($defs as $namespace => $path)
                 {
                     $first = $namespace[0];
                     if (!isset($this->_namespaces0[$ctx][$first]))
@@ -291,7 +291,7 @@ class Importer
             elseif (('psr-4' === $what) || ('namespaces' === $what))
             {
                 if (!isset($this->_namespaces[$ctx])) $this->_namespaces[$ctx] = array();
-                foreach ($defs as $namespace=>$path)
+                foreach ($defs as $namespace => $path)
                 {
                     $first = $namespace[0];
                     if (!isset($this->_namespaces[$ctx][$first]))
@@ -303,7 +303,7 @@ class Importer
             }
             elseif ('classes' === $what)
             {
-                if (!isset($defs[0]) || !is_array($defs[0]) ) $defs = array($defs); // make array of arrays
+                if (!isset($defs[0]) || !is_array($defs[0])) $defs = array($defs); // make array of arrays
                 if (!isset($this->_classes[$ctx])) $this->_classes[$ctx] = array();
                 if (!isset($this->_classmap[$ctx])) $this->_classmap[$ctx] = array();
                 foreach ($defs as $def)
@@ -312,8 +312,8 @@ class Importer
                     $classname = $def[0]; $id = $def[1]; $path = $def[2]; $deps = isset($def[3]) ? $def[3] : array();
                     if (!empty($classname) && !empty($id) && !empty($path))
                     {
-                        $path = $this->path( $path );
-                        $this->_classes[$ctx][ $id ] = array(
+                        $path = $this->path($path);
+                        $this->_classes[$ctx][$id] = array(
                             /* 0:class, 1:id, 2:path, 3:deps, 4:loaded */
                             $classname,
                             $id,
@@ -321,13 +321,13 @@ class Importer
                             (array)$deps,
                             false
                         );
-                        $this->_classmap[$ctx][ $classname ] = array($path, $id);
+                        $this->_classmap[$ctx][$classname] = array($path, $id);
                     }
                 }
             }
             elseif ('assets' === $what)
             {
-                if (!isset( $defs[0]) || !is_array($defs[0]) ) $defs = array($defs); // make array of arrays
+                if (!isset($defs[0]) || !is_array($defs[0])) $defs = array($defs); // make array of arrays
                 if ( !isset($this->_assets[$ctx]) ) $this->_assets[$ctx] = array();
                 foreach ($defs as $def)
                 {
@@ -360,7 +360,7 @@ class Importer
     protected function import_class($id, $ctx = '__global__', $require = null)
     {
         if (null == $ctx) $ctx = '__global__';
-        $queue = array( $id );
+        $queue = array($id);
         while (!empty($queue))
         {
             $id = $queue[0];
@@ -379,7 +379,7 @@ class Importer
                     {
                         $needs_deps = false;
                         $numdeps = count($deps);
-                        for ($i=$numdeps-1; $i>=0; $i--)
+                        for ($i=$numdeps-1; $i>=0; --$i)
                         {
                             $dep = $deps[$i];
                             $ctx3 = isset($this->_classes[$ctx][$dep]) ? $ctx : '__global__';
@@ -453,7 +453,7 @@ class Importer
                 {
                     $needs_deps = false;
                     $numdeps = count($deps);
-                    for ($i=$numdeps-1; $i>=0; $i--)
+                    for ($i=$numdeps-1; $i>=0; --$i)
                     {
                         $dep = $deps[$i];
                         $ctx3 = isset($this->_assets[$ctx][$dep]) ? $ctx : '__global__';
@@ -542,7 +542,7 @@ class Importer
                         }
                         elseif ($is_composite)
                         {
-                            foreach ($asset as $pi=>$part)
+                            foreach ($asset as $pi => $part)
                             {
                                 if (is_array($part))
                                 {
@@ -591,7 +591,7 @@ class Importer
     {
         if (null == $ctx) $ctx = '__global__';
         if (empty($ctx) || empty($this->_assets[$ctx])) return "";
-        $out = array( );
+        $out = array();
         $type = strtolower($type);
         $type_composite = $type . '-composite';
         $type_alt = $type . '-alt';
